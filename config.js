@@ -1,1 +1,1 @@
-window.AGENDEAQUI_API_URL = "";
+window.AGENDEAQUI_API_URL = "https://agendeaquiweb.onrender.com";
