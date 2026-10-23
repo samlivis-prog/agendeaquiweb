@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>AgendeAqui | Consultas</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <section class="auth-screen" id="auth-screen">
+    <form class="auth-card" id="login-form">
+      <span class="brand-mark" aria-hidden="true">+</span>
+      <p class="eyebrow">AGENDA NA NUVEM</p>
+      <h1>Entrar no AgendeAqui</h1>
+      <p class="auth-description">Acesse com seu usuário para consultar e atualizar os dados da equipe.</p>
+      <label class="field" for="login-email"><span>E-mail</span><input id="login-email" type="email" autocomplete="username" required></label>
+      <label class="field" for="login-password"><span>Senha</span><input id="login-password" type="password" autocomplete="current-password" required></label>
+      <p class="auth-error" id="auth-error" role="alert" hidden></p>
+      <button class="button button-primary" id="login-button" type="submit">Entrar</button>
+      <small>O acesso é individual. Peça ao administrador da conta para criar seu usuário.</small>
+    </form>
+  </section>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="AgendeAqui - início">
+        <span class="brand-mark" aria-hidden="true">+</span>
+        <span>agende<span class="brand-highlight">Aqui</span></span>
+      </a>
+
+      <div class="sidebar-caption">CONSULTÓRIO</div>
+      <nav aria-label="Navegação principal">
+        <a class="nav-link is-active" href="#agenda" data-view="agenda"><span class="nav-icon" aria-hidden="true">▦</span> Agenda</a>
+        <a class="nav-link" href="#minha-agenda" data-view="calendar"><span class="nav-icon" aria-hidden="true">▣</span> Minha Agenda</a>
+        <a class="nav-link" href="#medicos" data-view="doctors"><span class="nav-icon" aria-hidden="true">♙</span> Médicos</a>
+        <a class="nav-link" href="#financeiro" data-view="financial"><span class="nav-icon" aria-hidden="true">R$</span> Dados financeiros</a>
+        <a class="nav-link" href="#formulario" data-view="form"><span class="nav-icon" aria-hidden="true">＋</span> Nova consulta</a>
+      </nav>
+
+      <div class="sidebar-note">
+        <span class="note-icon" aria-hidden="true">✳</span>
+        <strong>Organização simples,</strong>
+        <span>atendimento melhor.</span>
+      </div>
+      <div class="sidebar-footer">AgendeAqui <span>•</span> versão inicial</div>
+    </aside>
+
+    <main class="main-content" id="inicio">
+      <header class="topbar">
+        <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">+</span> agende<span class="brand-highlight">Aqui</span></div>
+        <div class="topbar-spacer"></div>
+        <span class="today-label" id="today-label"></span>
+        <button class="button button-whatsapp-start" id="open-whatsapp" type="button"><span aria-hidden="true">↗</span> Abrir WhatsApp Web</button>
+        <button class="button button-outline" id="manage-users-button" type="button" hidden>Adicionar usuário</button>
+        <button class="button button-outline" id="logout-button" type="button">Sair</button>
+        <span class="avatar" aria-label="Perfil da secretária">S</span>
+      </header>
+      <nav class="mobile-nav" aria-label="Navegação da agenda">
+        <a class="mobile-nav-link is-active" href="#agenda" data-view="agenda"><span aria-hidden="true">▦</span> Agenda</a>
+        <a class="mobile-nav-link" href="#minha-agenda" data-view="calendar"><span aria-hidden="true">▣</span> Minha Agenda</a>
+        <a class="mobile-nav-link" href="#medicos" data-view="doctors"><span aria-hidden="true">♙</span> Médicos</a>
+        <a class="mobile-nav-link" href="#financeiro" data-view="financial"><span aria-hidden="true">R$</span> Financeiro</a>
+      </nav>
+
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">PAINEL DO CONSULTÓRIO</p>
+          <h1 id="page-title">Agenda de consultas</h1>
+          <p class="page-subtitle" id="page-subtitle">Cadastre e acompanhe os agendamentos do consultório.</p>
+        </div>
+        <div class="heading-actions">
+          <button class="button button-outline export-button" id="export-data" type="button"><span aria-hidden="true">↓</span> Exportar dados</button>
+          <button class="button button-primary heading-button" id="new-appointment" type="button"><span aria-hidden="true">＋</span> Nova consulta</button>
+        </div>
+      </section>
+
+      <section class="stats-grid" id="stats-grid" aria-label="Resumo da agenda">
+        <article class="stat-card">
+          <div class="stat-top"><span>Consultas de hoje</span><span class="stat-icon lavender" aria-hidden="true">▦</span></div>
+          <strong id="stat-today">0</strong>
+          <span class="stat-foot">agendadas para hoje</span>
+        </article>
+        <article class="stat-card">
+          <div class="stat-top"><span>Próximas consultas</span><span class="stat-icon mint" aria-hidden="true">◷</span></div>
+          <strong id="stat-upcoming">0</strong>
+          <span class="stat-foot">a partir de hoje</span>
+        </article>
+        <button class="stat-card stat-card-button" id="confirmation-alert-card" type="button" aria-controls="confirmation-alert">
+          <span class="stat-top"><span>A confirmar amanhã</span><span class="stat-icon peach" aria-hidden="true">◉</span></span>
+          <strong id="stat-pending">0</strong>
+          <span class="stat-foot">clique para enviar lembretes</span>
+        </button>
+      </section>
+
+      <section class="appointments-panel confirmation-alert" id="confirmation-alert" aria-labelledby="confirmation-alert-title" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">LEMBRETE DE VÉSPERA</p>
+            <h2 id="confirmation-alert-title">Consultas a confirmar</h2>
+            <p id="confirmation-alert-description">Envie uma mensagem pelo WhatsApp para pedir a confirmação de presença.</p>
+          </div>
+          <span class="result-count" id="confirmation-alert-count">0 consultas</span>
+        </div>
+        <div class="confirmation-list" id="confirmation-list"></div>
+      </section>
+
+      <section class="financial-panel appointments-panel" id="financial-panel" aria-labelledby="financial-title" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">CONTROLE FINANCEIRO</p>
+            <h2 id="financial-title">Dados financeiros</h2>
+            <p>Resumo dos pagamentos das consultas cadastradas.</p>
+          </div>
+        </div>
+        <div class="financial-summary">
+          <article class="financial-card"><span>Recebido no período</span><strong id="financial-received">R$ 0,00</strong></article>
+          <article class="financial-card"><span>Pagamentos pendentes</span><strong id="financial-pending">R$ 0,00</strong></article>
+          <article class="financial-card"><span>Faturamento previsto no mês</span><strong id="financial-month-revenue">R$ 0,00</strong></article>
+          <article class="financial-card"><span>Faturamento previsto no ano</span><strong id="financial-year-revenue">R$ 0,00</strong></article>
+        </div>
+        <div class="financial-filters">
+          <label class="field"><span>De</span><input id="financial-date-from" type="date"></label>
+          <label class="field"><span>Até</span><input id="financial-date-to" type="date"></label>
+          <label class="field"><span>Médico</span><select id="financial-doctor-filter"><option value="all">Todos os médicos</option></select></label>
+          <button class="button button-outline" id="financial-filter-reset" type="button">Este mês</button>
+        </div>
+        <section class="daily-flow-section" aria-labelledby="daily-flow-title">
+          <div class="panel-heading"><div><h2 id="daily-flow-title">Fluxo diário de recebimentos</h2><p>Valores confirmados por dia de pagamento no período filtrado.</p></div></div>
+          <div class="daily-flow-chart" id="daily-flow-chart" role="img" aria-label="Gráfico do fluxo diário de recebimentos"></div>
+        </section>
+        <div class="panel-heading financial-list-heading"><div><h2>Pagamentos registrados</h2><p>Valores efetivamente recebidos, incluindo repasses de convênio.</p></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data do pagamento</th><th>Paciente</th><th>Médico</th><th>Método</th><th>Valor recebido</th></tr></thead>
+            <tbody id="financial-payments-list"></tbody>
+          </table>
+          <div class="empty-state" id="financial-empty-state"><span class="empty-icon" aria-hidden="true">R$</span><strong>Nenhum pagamento registrado</strong><p>Os pagamentos confirmados aparecerão aqui.</p></div>
+        </div>
+      </section>
+
+      <section class="appointments-panel calendar-panel" id="calendar-panel" aria-labelledby="calendar-title" hidden>
+        <div class="panel-heading calendar-panel-heading">
+          <div>
+            <h2 id="calendar-title">Calendário de consultas</h2>
+                <p>Consulte os agendamentos e horários vagos do consultório.</p>
+          </div>
+          <div class="calendar-month-controls">
+            <button class="icon-button calendar-nav-button" id="calendar-previous" type="button" aria-label="Mês anterior">‹</button>
+            <button class="button button-outline calendar-today-button" id="calendar-today" type="button">Hoje</button>
+            <button class="icon-button calendar-nav-button" id="calendar-next" type="button" aria-label="Próximo mês">›</button>
+          </div>
+        </div>
+        <div class="calendar-month-label" id="calendar-month-label"></div>
+        <div class="calendar-doctor-filter">
+          <label class="field">
+            <span>Agenda do médico</span>
+            <select id="calendar-doctor-filter" aria-label="Selecionar médico para visualizar a agenda"></select>
+          </label>
+        </div>
+        <div class="calendar-legend" aria-label="Legenda das situações">
+          <span><b class="calendar-status-icon status-agendada" aria-hidden="true">◷</b> Agendada</span>
+          <span><b class="calendar-status-icon status-confirmada" aria-hidden="true">✓</b> Confirmada</span>
+          <span><b class="calendar-status-icon status-concluida" aria-hidden="true">●</b> Concluída</span>
+          <span><b class="calendar-status-icon status-cancelada" aria-hidden="true">×</b> Cancelada</span>
+          <span><b class="availability-key" aria-hidden="true"></b> Horário vago</span>
+        </div>
+        <div class="calendar-content">
+          <div class="month-calendar">
+            <div class="calendar-grid calendar-weekdays" aria-hidden="true">
+              <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+            </div>
+            <div class="calendar-grid calendar-days" id="calendar-days" aria-label="Dias do mês"></div>
+          </div>
+          <aside class="day-schedule" aria-labelledby="selected-date-title">
+            <div class="day-schedule-header">
+              <div>
+                <p class="eyebrow">DETALHES DO DIA</p>
+                <h3 id="selected-date-title"></h3>
+              </div>
+              <span class="day-appointment-count" id="day-appointment-count"></span>
+            </div>
+            <div class="share-day-controls">
+              <a class="button button-outline share-day-button" id="share-day-agenda" href="#">↗ Enviar agenda pelo WhatsApp</a>
+            </div>
+            <p class="schedule-hours-note" id="schedule-hours-note">Selecione um médico para consultar os horários de atendimento.</p>
+            <div class="day-schedule-list" id="day-schedule-list"></div>
+          </aside>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true">ⓘ</span> A disponibilidade considera os dias, horários, duração média e consultas cadastradas para o médico selecionado.</p>
+      </section>
+
+      <section class="appointments-panel" id="appointments-panel" aria-labelledby="appointments-title">
+        <div class="panel-heading">
+          <div>
+            <h2 id="appointments-title">Consultas agendadas</h2>
+            <p>Visualize e gerencie os horários do consultório.</p>
+          </div>
+          <span class="result-count" id="result-count">0 consultas</span>
+        </div>
+        <div class="filters">
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="search-input" type="search" placeholder="Buscar por paciente ou telefone" autocomplete="off">
+          </label>
+          <label class="filter-select">
+            <span class="sr-only">Filtrar por data</span>
+            <select id="date-filter">
+              <option value="all">Todas as datas</option>
+              <option value="today">Hoje</option>
+              <option value="upcoming">Próximas</option>
+              <option value="past">Anteriores</option>
+            </select>
+          </label>
+          <label class="filter-select">
+            <span class="sr-only">Filtrar por situação</span>
+            <select id="status-filter">
+              <option value="all">Todas as situações</option>
+              <option value="Agendada">Agendada</option>
+              <option value="Confirmada">Confirmada</option>
+              <option value="Concluída">Concluída</option>
+              <option value="Cancelada">Cancelada</option>
+            </select>
+          </label>
+          <label class="filter-select">
+            <span class="sr-only">Filtrar por médico</span>
+            <select id="appointment-doctor-filter" aria-label="Filtrar consultas por médico">
+              <option value="all">Todos os médicos</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Data e horário</th>
+                <th>Médico</th>
+                <th>Tipo</th>
+                <th>Pagamento</th>
+                <th>Situação</th>
+                <th><span class="sr-only">Ações</span></th>
+              </tr>
+            </thead>
+            <tbody id="appointments-list"></tbody>
+          </table>
+          <div class="empty-state" id="empty-state">
+            <span class="empty-icon" aria-hidden="true">▦</span>
+            <strong id="empty-title">Sua agenda começa aqui</strong>
+            <p id="empty-description">Cadastre a primeira consulta para organizar os horários do consultório.</p>
+            <a class="button button-outline" href="#formulario">＋ Cadastrar consulta</a>
+          </div>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true">ⓘ</span> Os dados ficam salvos somente neste navegador.</p>
+      </section>
+
+      <dialog class="appointment-form-dialog" id="appointment-form-dialog" aria-labelledby="form-title">
+      <section class="form-panel" id="formulario" aria-labelledby="form-title">
+        <div class="appointment-form-error" id="appointment-form-error" role="alert" hidden></div>
+        <div class="panel-heading form-heading">
+          <div>
+            <p class="eyebrow">CADASTRO</p>
+            <h2 id="form-title">Agendar consulta</h2>
+            <p>Preencha os dados para incluir um horário na agenda.</p>
+          </div>
+          <span class="form-step">01 <span>/</span> 01</span>
+          <button class="icon-button appointment-form-close" id="close-appointment-form" type="button" aria-label="Fechar cadastro">×</button>
+        </div>
+
+        <form id="appointment-form">
+          <input id="appointment-id" type="hidden">
+          <fieldset>
+            <legend><span class="legend-number">1</span> Dados do paciente</legend>
+            <div class="form-grid patient-grid">
+              <label class="field field-wide">
+                <span>Nome completo <b>*</b></span>
+                <input id="patient-name" name="patientName" type="text" placeholder="Ex.: Maria da Silva" autocomplete="name" maxlength="100" required>
+              </label>
+              <label class="field">
+                <span>Telefone / WhatsApp <b>*</b></span>
+                <input id="patient-phone" name="patientPhone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel" maxlength="20" required>
+              </label>
+              <label class="field">
+                <span>E-mail</span>
+                <input id="patient-email" name="patientEmail" type="email" placeholder="paciente@email.com" autocomplete="email" maxlength="120">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span class="legend-number">2</span> Detalhes da consulta</legend>
+            <div class="form-grid">
+              <label class="field field-wide">
+                <span>Especialidade</span>
+                <input id="appointment-specialty" name="specialty" type="text" placeholder="Preenchida pelo médico selecionado" readonly>
+              </label>
+              <label class="field field-wide">
+                <span>Motivo da consulta <b>*</b></span>
+                <input id="appointment-reason" name="reason" type="text" placeholder="Ex.: avaliação, acompanhamento..." maxlength="100" required>
+              </label>
+              <label class="field field-wide">
+                <span>Médico <b>*</b></span>
+                <select id="appointment-doctor" name="doctorId" required>
+                  <option value="">Cadastre um médico para agendar</option>
+                </select>
+              </label>
+              <label class="field field-wide">
+                <span>Procedimento</span>
+                <select id="appointment-procedure" name="procedureName">
+                  <option value="">Selecione um procedimento (opcional)</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Data <b>*</b></span>
+                <input id="appointment-date" name="date" type="date" required>
+              </label>
+              <label class="field">
+                <span>Horário <b>*</b></span>
+                <input id="appointment-time" name="time" type="time" required>
+              </label>
+              <label class="field">
+                <span>Tipo de consulta <b>*</b></span>
+                <select id="appointment-type" name="type" required>
+                  <option value="Primeira consulta">Primeira consulta</option>
+                  <option value="Retorno">Retorno</option>
+                  <option value="Acompanhamento">Acompanhamento</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Atendimento <b>*</b></span>
+                <select id="attendance-type" name="attendanceType" required>
+                  <option value="Particular">Particular</option>
+                  <option value="Convênio">Convênio</option>
+                </select>
+              </label>
+              <div class="field-wide insurance-fields" id="insurance-fields" hidden>
+                <div class="form-grid insurance-grid">
+                  <label class="field">
+                    <span>Nome do convênio <b>*</b></span>
+                    <select id="insurance-name" name="insuranceName" disabled>
+                      <option value="">Selecione um convênio</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Valor de repasse do convênio <b>*</b></span>
+                    <div class="input-prefix"><span>R$</span><input id="insurance-reimbursement" name="insuranceReimbursement" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" readonly disabled></div>
+                  </label>
+                </div>
+              </div>
+              <label class="field">
+                <span>Situação <b>*</b></span>
+                <select id="appointment-status" name="status" required>
+                  <option value="Agendada">Agendada</option>
+                  <option value="Confirmada">Confirmada</option>
+                  <option value="Concluída">Concluída</option>
+                  <option value="Cancelada">Cancelada</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><span class="legend-number">3</span> Pagamento</legend>
+            <div class="form-grid">
+              <label class="field">
+                <span>Valor da consulta</span>
+                <div class="input-prefix"><span>R$</span><input id="appointment-value" name="value" type="number" min="0" step="0.01" placeholder="0,00" inputmode="decimal"></div>
+              </label>
+              <label class="field">
+                <span>Método de pagamento</span>
+                <select id="payment-method" name="paymentMethod">
+                  <option value="">A definir</option>
+                  <option value="Pix">Pix</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Cartão de crédito">Cartão de crédito</option>
+                  <option value="Cartão de débito">Cartão de débito</option>
+                  <option value="Convênio">Convênio</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Pagamento</span>
+                <select id="payment-status" name="paymentStatus">
+                  <option value="Pendente">Pendente</option>
+                  <option value="Pago">Pago</option>
+                  <option value="Isento">Isento</option>
+                </select>
+              </label>
+              <label class="field field-wide">
+                <span>Observações <small>(opcional)</small></span>
+                <textarea id="appointment-notes" name="notes" rows="3" maxlength="500" placeholder="Informações úteis para a organização da consulta"></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="form-actions">
+            <button class="button button-text" type="reset" id="cancel-edit" hidden>Cancelar edição</button>
+            <button class="button button-primary" type="submit" id="save-button"><span aria-hidden="true">＋</span> Salvar consulta</button>
+          </div>
+        </form>
+      </section>
+      </dialog>
+
+      <section class="form-panel doctors-panel" id="doctors-panel" aria-labelledby="doctors-title" hidden>
+        <section class="doctor-directory" aria-labelledby="doctor-directory-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">EQUIPE DO CONSULTÓRIO</p>
+              <h2 id="doctor-directory-title">Médicos cadastrados</h2>
+            </div>
+            <span class="result-count" id="doctor-count">0 médicos</span>
+          </div>
+          <div class="doctor-list" id="doctor-list"></div>
+        </section>
+        <div class="panel-heading form-heading">
+          <div>
+            <p class="eyebrow">EQUIPE DO CONSULTÓRIO</p>
+            <h2 id="doctors-title">Cadastrar médico</h2>
+            <p id="doctor-form-description">Cadastre os profissionais e configure dias, horários, duração e valor das consultas.</p>
+          </div>
+          <span class="form-step">MÉDICOS</span>
+        </div>
+        <form id="doctor-form">
+          <input id="doctor-id" type="hidden">
+          <fieldset>
+            <legend><span class="legend-number">1</span> Dados do médico</legend>
+            <div class="form-grid">
+              <label class="field field-wide">
+                <span>Nome completo <b>*</b></span>
+                <input id="doctor-full-name" type="text" maxlength="100" autocomplete="name" required>
+              </label>
+              <label class="field">
+                <span>Especialidade <b>*</b></span>
+                <input id="doctor-specialty" type="text" maxlength="100" required>
+              </label>
+              <label class="field">
+                <span>Celular / WhatsApp <b>*</b></span>
+                <input id="doctor-cellphone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="DDD + número" required>
+              </label>
+              <label class="field">
+                <span>Valor padrão da consulta <b>*</b></span>
+                <div class="input-prefix"><span>R$</span><input id="doctor-consultation-value" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" required></div>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend><span class="legend-number">2</span> Convênios aceitos</legend>
+            <p class="doctor-days-help">Cadastre cada convênio e o valor que será repassado ao médico. Não é obrigatório cadastrar convênios.</p>
+            <div class="doctor-insurances" id="doctor-insurances"></div>
+            <button class="button button-outline add-insurance-button" id="add-doctor-insurance" type="button">＋ Adicionar convênio</button>
+          </fieldset>
+          <fieldset>
+            <legend><span class="legend-number">3</span> Procedimentos realizados</legend>
+            <p class="doctor-days-help">Cadastre os procedimentos oferecidos por este médico e seus valores. Eles poderão ser selecionados no agendamento.</p>
+            <div class="doctor-procedures" id="doctor-procedures"></div>
+            <button class="button button-outline add-insurance-button" id="add-doctor-procedure" type="button">＋ Adicionar procedimento</button>
+          </fieldset>
+          <fieldset>
+            <legend><span class="legend-number">4</span> Dias e horários de atendimento</legend>
+            <p class="doctor-days-help">Ative os dias de atendimento e informe horários diferentes para cada dia. O segundo período é opcional.</p>
+            <div class="doctor-weekly-schedule" id="doctor-weekly-schedule"></div>
+          </fieldset>
+          <fieldset>
+            <legend><span class="legend-number">5</span> Duração média das consultas</legend>
+            <div class="form-grid doctor-duration-grid">
+              <label class="field">
+                <span>Primeira consulta (minutos) <b>*</b></span>
+                <input id="doctor-first-duration" type="number" min="5" max="240" step="5" value="60" required>
+              </label>
+              <label class="field">
+                <span>Retorno (minutos) <b>*</b></span>
+                <input id="doctor-return-duration" type="number" min="5" max="240" step="5" value="30" required>
+              </label>
+            </div>
+          </fieldset>
+          <div class="form-actions">
+            <button class="button button-text" type="button" id="cancel-doctor-edit" hidden>Cancelar edição</button>
+            <button class="button button-primary" type="submit" id="save-doctor-button"><span aria-hidden="true">＋</span> Salvar médico</button>
+          </div>
+        </form>
+      </section>
+
+      <footer class="page-footer">AgendeAqui <span>•</span> Uma agenda mais organizada para o seu consultório.</footer>
+    </main>
+  </div>
+  <dialog class="details-dialog user-dialog" id="user-dialog" aria-labelledby="user-dialog-title">
+    <div class="details-card">
+      <header class="details-header">
+        <div>
+          <p class="eyebrow">ACESSO À EQUIPE</p>
+          <h2 id="user-dialog-title">Adicionar usuário</h2>
+        </div>
+        <button class="icon-button details-close" id="close-user-dialog" type="button" aria-label="Fechar">×</button>
+      </header>
+      <form class="auth-card user-form" id="user-form">
+        <label class="field" for="new-user-email"><span>E-mail</span><input id="new-user-email" type="email" autocomplete="off" required></label>
+        <label class="field" for="new-user-password"><span>Senha temporária (mínimo 12 caracteres)</span><input id="new-user-password" type="password" minlength="12" autocomplete="new-password" required></label>
+        <p class="auth-description">Compartilhe a senha temporária com o usuário por um canal seguro.</p>
+        <div class="form-actions">
+          <button class="button button-text" id="cancel-user-create" type="button">Cancelar</button>
+          <button class="button button-primary" type="submit">Criar usuário</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+  <dialog class="details-dialog" id="appointment-dialog" aria-labelledby="details-title">
+    <div class="details-card">
+      <header class="details-header">
+        <div>
+          <p class="eyebrow">DETALHES DO AGENDAMENTO</p>
+          <h2 id="details-title">Consulta</h2>
+        </div>
+        <button class="icon-button details-close" id="close-details" type="button" aria-label="Fechar detalhes">×</button>
+      </header>
+      <div id="appointment-details"></div>
+      <form class="payment-confirmation-form" id="payment-confirmation-form" hidden>
+        <h3>Confirmar recebimento</h3>
+        <div class="payment-confirmation-fields">
+          <label class="field">
+            <span>Valor recebido <b>*</b></span>
+            <div class="input-prefix"><span>R$</span><input id="confirmation-payment-value" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
+          </label>
+          <label class="field">
+            <span>Método de pagamento <b>*</b></span>
+            <select id="confirmation-payment-method" required>
+              <option value="">Selecione o método</option>
+              <option value="Pix">Pix</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Cartão de crédito">Cartão de crédito</option>
+              <option value="Cartão de débito">Cartão de débito</option>
+              <option value="Convênio">Convênio</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </label>
+        </div>
+        <div class="payment-confirmation-actions">
+          <button class="button button-text" id="cancel-payment-confirmation" type="button">Cancelar</button>
+          <button class="button button-primary" type="submit">Salvar pagamento</button>
+        </div>
+      </form>
+      <section class="observations-section" aria-labelledby="observations-title">
+        <div class="observations-heading">
+          <div>
+            <h3 id="observations-title">Observações</h3>
+            <p>Registre confirmações e outros contatos sobre esta consulta.</p>
+          </div>
+          <button class="button button-outline confirmation-button" id="record-confirmation" type="button">✓ Registrar confirmação</button>
+        </div>
+        <div class="observation-list" id="observation-list"></div>
+        <form class="observation-form" id="observation-form">
+          <label class="field" for="new-observation">
+            <span>Nova observação</span>
+            <textarea id="new-observation" rows="3" maxlength="500" placeholder="Ex.: Paciente confirmou presença pelo WhatsApp." required></textarea>
+          </label>
+          <button class="button button-primary" type="submit">Adicionar observação</button>
+        </form>
+      </section>
+      <footer class="details-footer">
+        <span>Dados sincronizados com a nuvem.</span>
+        <div class="details-actions">
+          <button class="button button-primary" id="details-confirm-payment" type="button">Confirmar pagamento</button>
+          <button class="button button-text" id="details-edit" type="button">Editar consulta</button>
+        </div>
+      </footer>
+    </div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
