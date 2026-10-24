@@ -39,6 +39,12 @@
   const doctorProcedureList = document.getElementById("doctor-procedures");
   const doctorList = document.getElementById("doctor-list");
   const doctorsPanel = document.getElementById("doctors-panel");
+  const doctorFormDialog = document.getElementById("doctor-form-dialog");
+  const doctorFormError = document.getElementById("doctor-form-error");
+  const doctorPhotoInput = document.getElementById("doctor-photo");
+  const doctorPhotoImage = document.getElementById("doctor-photo-image");
+  const doctorPhotoPlaceholder = document.getElementById("doctor-photo-placeholder");
+  const removeDoctorPhotoButton = document.getElementById("remove-doctor-photo");
   const shareDayAgendaLink = document.getElementById("share-day-agenda");
   const openWhatsappButton = document.getElementById("open-whatsapp");
   const pageTitle = document.getElementById("page-title");
@@ -66,6 +72,12 @@
   const financialDateFrom = document.getElementById("financial-date-from");
   const financialDateTo = document.getElementById("financial-date-to");
   const financialDoctorFilter = document.getElementById("financial-doctor-filter");
+  const medicalRecordsPanel = document.getElementById("medical-records-panel");
+  const medicalRecordAppointment = document.getElementById("medical-record-appointment");
+  const medicalRecordPatient = document.getElementById("medical-record-patient");
+  const medicalRecordEmpty = document.getElementById("medical-record-empty");
+  const medicalRecordForm = document.getElementById("medical-record-form");
+  const medicalRecordUpdated = document.getElementById("medical-record-updated");
   const authScreen = document.getElementById("auth-screen");
   const appShell = document.getElementById("app-shell");
   const loginForm = document.getElementById("login-form");
@@ -76,7 +88,14 @@
   const manageUsersButton = document.getElementById("manage-users-button");
   const userDialog = document.getElementById("user-dialog");
   const userForm = document.getElementById("user-form");
+  const newUserRole = document.getElementById("new-user-role");
+  const newUserDoctorField = document.getElementById("new-user-doctor-field");
+  const newUserDoctor = document.getElementById("new-user-doctor");
   let currentUserRole = "";
+  let currentUserDoctorId = "";
+  let doctorPhotoData = "";
+  let doctorPhotoProcessing = false;
+  let medicalRecords = new Map();
   let activeDetailsId = null;
   let activeView = "agenda";
   let whatsappWindow = null;
@@ -123,6 +142,10 @@
   }
 
   function showLogin(message = "") {
+    if (detailsDialog.open) detailsDialog.close();
+    if (appointmentFormDialog.open) appointmentFormDialog.close();
+    if (doctorFormDialog.open) resetDoctorForm();
+    if (userDialog.open) userDialog.close();
     authScreen.hidden = false;
     appShell.hidden = true;
     authError.textContent = message || (API_BASE_URL ? "" : "Configure a URL da API publicada em config.js.");
@@ -186,11 +209,15 @@
   }
 
   async function loadCloudState() {
+    setActiveView("agenda");
     const state = await apiRequest("/api/state");
     appointments = Array.isArray(state.appointments) ? state.appointments : [];
     doctors = Array.isArray(state.doctors) ? state.doctors : [];
     cloudSnapshots.appointments = copyRecords(appointments);
     cloudSnapshots.doctors = copyRecords(doctors);
+    medicalRecords = currentUserRole === "doctor"
+      ? new Map((await apiRequest("/api/medical-records")).records.map((record) => [record.appointmentId, record]))
+      : new Map();
 
     if (!appointments.length && !doctors.length) {
       const legacyDoctors = readLegacyRecords(DOCTORS_STORAGE_KEY);
@@ -212,6 +239,9 @@
     authScreen.hidden = true;
     appShell.hidden = false;
     manageUsersButton.hidden = currentUserRole !== "owner";
+    document.querySelectorAll('[data-role="doctor"]').forEach((link) => {
+      link.hidden = currentUserRole !== "doctor";
+    });
   }
 
   async function initializeCloudSession() {
@@ -223,10 +253,13 @@
     try {
       const session = await apiRequest("/api/auth/me");
       currentUserRole = session.user.role;
+      currentUserDoctorId = session.user.doctorId || "";
       await loadCloudState();
     } catch (error) {
       console.error("Não foi possível iniciar a sessão do AgendeAqui.", error);
       authToken = "";
+      currentUserRole = "";
+      currentUserDoctorId = "";
       sessionStorage.removeItem(TOKEN_KEY);
       showLogin(error.message);
     }
@@ -234,7 +267,8 @@
 
   async function refreshCloudState() {
     if (!authToken || pendingSaves || syncing || detailsDialog.open
-      || appointmentFormDialog.open || document.getElementById("doctor-id").value) return;
+      || appointmentFormDialog.open || document.getElementById("doctor-id").value
+      || activeView === "medical-records") return;
     syncing = true;
     try {
       const state = await apiRequest("/api/state");
@@ -242,6 +276,10 @@
       doctors = Array.isArray(state.doctors) ? state.doctors : [];
       cloudSnapshots.appointments = copyRecords(appointments);
       cloudSnapshots.doctors = copyRecords(doctors);
+      if (currentUserRole === "doctor") {
+        const result = await apiRequest("/api/medical-records");
+        medicalRecords = new Map(result.records.map((record) => [record.appointmentId, record]));
+      }
       render();
     } catch (error) {
       console.error("Não foi possível atualizar os dados da nuvem.", error);
@@ -299,10 +337,11 @@
   function exportSystemData() {
     const payload = {
       format: "agendeAqui-export",
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       doctors,
-      appointments
+      appointments,
+      ...(currentUserRole === "doctor" ? { medicalRecords: [...medicalRecords.values()] } : {})
     };
     const file = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(file);
@@ -313,10 +352,19 @@
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast("Arquivo JSON com médicos e consultas exportado.");
+    showToast(currentUserRole === "doctor"
+      ? "Arquivo JSON com agenda e prontuários do seu cadastro exportado."
+      : "Arquivo JSON com médicos e consultas exportado.");
   }
 
   function showToast(message) {
+    if (doctorFormDialog.open) {
+      doctorFormError.textContent = message;
+      doctorFormError.hidden = false;
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => { doctorFormError.hidden = true; }, 5000);
+      return;
+    }
     if (appointmentFormDialog.open) {
       appointmentFormError.textContent = message;
       appointmentFormError.hidden = false;
@@ -339,6 +387,47 @@
   function formatCurrency(value) {
     const amount = Number(value);
     return Number.isFinite(amount) ? amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ 0,00";
+  }
+
+  function updateDoctorPhotoPreview() {
+    const hasPhoto = /^data:image\/jpeg;base64,/.test(doctorPhotoData);
+    doctorPhotoImage.hidden = !hasPhoto;
+    doctorPhotoPlaceholder.hidden = hasPhoto;
+    removeDoctorPhotoButton.hidden = !hasPhoto;
+    if (hasPhoto) doctorPhotoImage.src = doctorPhotoData;
+    else doctorPhotoImage.removeAttribute("src");
+  }
+
+  function processDoctorPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const maxDimension = 512;
+        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Não foi possível processar a foto neste navegador."));
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+        if (dataUrl.length > 500_000) {
+          reject(new Error("A foto ficou muito grande após a compressão. Escolha outra imagem."));
+          return;
+        }
+        resolve(dataUrl);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Não foi possível abrir essa imagem. Escolha um arquivo JPG, PNG ou WebP válido."));
+      };
+      image.src = objectUrl;
+    });
   }
 
   function formatTimestamp(value) {
@@ -488,7 +577,12 @@
   function renderDoctorList() {
     document.getElementById("doctor-count").textContent = `${doctors.length} ${doctors.length === 1 ? "médico" : "médicos"}`;
     doctorList.innerHTML = doctors.length
-      ? doctors.slice().sort((first, second) => first.name.localeCompare(second.name, "pt-BR")).map((doctor) => `<article class="doctor-list-item">
+      ? doctors.slice().sort((first, second) => first.name.localeCompare(second.name, "pt-BR")).map((doctor) => {
+        const photo = /^data:image\/jpeg;base64,/.test(doctor.photo || "")
+          ? `<img class="doctor-list-photo" src="${escapeHTML(doctor.photo)}" alt="Foto de ${escapeHTML(doctor.name)}">`
+          : `<span class="doctor-list-avatar" aria-hidden="true">${escapeHTML(initials(doctor.name) || "M")}</span>`;
+        return `<article class="doctor-list-item">
+          ${photo}
           <div class="doctor-list-info">
             <strong>${escapeHTML(doctor.name)}</strong>
             <span>${escapeHTML(doctor.specialty || "Especialidade não informada")}</span>
@@ -498,7 +592,8 @@
             <button class="button button-outline" type="button" data-edit-doctor="${escapeHTML(doctor.id)}">Editar</button>
             <button class="button button-outline doctor-delete-button" type="button" data-delete-doctor="${escapeHTML(doctor.id)}">Excluir</button>
           </div>
-        </article>`).join("")
+        </article>`;
+      }).join("")
       : '<p class="doctor-list-empty">Nenhum médico cadastrado ainda.</p>';
   }
 
@@ -516,6 +611,10 @@
     const options = doctors.slice().sort((first, second) => first.name.localeCompare(second.name, "pt-BR"))
       .map((doctor) => `<option value="${escapeHTML(doctor.id)}">${escapeHTML(doctor.name)} · ${escapeHTML(doctor.specialty)}</option>`)
       .join("");
+    const selectedUserDoctorId = newUserDoctor.value;
+    newUserDoctor.innerHTML = `<option value="">Selecione o médico</option>${options}`;
+    newUserDoctor.value = doctors.some((doctor) => doctor.id === selectedUserDoctorId) ? selectedUserDoctorId : "";
+    newUserDoctor.disabled = doctors.length === 0;
 
     appointmentDoctorInput.innerHTML = `<option value="">${doctors.length ? "Selecione um médico" : "Cadastre um médico para agendar"}</option>${options}`;
     appointmentDoctorInput.value = doctors.some((doctor) => doctor.id === selectedAppointmentId) ? selectedAppointmentId : "";
@@ -536,6 +635,55 @@
       : (doctors[0] ? doctors[0].id : "");
     calendarDoctorFilter.value = selectedCalendarDoctorId;
     calendarDoctorFilter.disabled = doctors.length === 0;
+  }
+
+  function renderMedicalRecordForm() {
+    const appointmentId = medicalRecordAppointment.value;
+    const appointment = appointments.find((item) => item.id === appointmentId
+      && item.doctorId === currentUserDoctorId);
+    const record = appointment ? medicalRecords.get(appointment.id) : null;
+    medicalRecordPatient.hidden = !appointment;
+    medicalRecordForm.hidden = !appointment;
+    medicalRecordEmpty.hidden = Boolean(appointment);
+    if (!appointment) {
+      medicalRecordPatient.textContent = "";
+      medicalRecordUpdated.textContent = "";
+      return;
+    }
+
+    medicalRecordPatient.textContent = `${appointment.patientName} · ${formatDate(appointment.date)} às ${appointment.time} · ${appointment.type || "Consulta"}`;
+    for (const field of medicalRecordForm.querySelectorAll("textarea[name]")) {
+      field.value = record?.content?.[field.name] || "";
+    }
+    medicalRecordUpdated.textContent = record?.updatedAt
+      ? `Última atualização: ${formatTimestamp(record.updatedAt)}`
+      : "Ainda não há registro clínico para esta consulta.";
+  }
+
+  function renderMedicalRecords() {
+    const selectedId = medicalRecordAppointment.value;
+    const doctorAppointments = appointments
+      .filter((appointment) => appointment.doctorId === currentUserDoctorId)
+      .slice()
+      .sort((first, second) => `${second.date || ""} ${second.time || ""}`.localeCompare(`${first.date || ""} ${first.time || ""}`));
+    medicalRecordAppointment.innerHTML = doctorAppointments.length
+      ? doctorAppointments.map((appointment) => `<option value="${escapeHTML(appointment.id)}">${escapeHTML(appointment.patientName)} · ${escapeHTML(formatDate(appointment.date))} ${escapeHTML(appointment.time)}</option>`).join("")
+      : '<option value="">Nenhuma consulta vinculada</option>';
+    medicalRecordAppointment.disabled = doctorAppointments.length === 0;
+    medicalRecordEmpty.textContent = doctorAppointments.length
+      ? "Selecione uma consulta para consultar ou preencher o prontuário."
+      : "Não há consultas associadas ao seu usuário médico.";
+    medicalRecordAppointment.value = doctorAppointments.some((appointment) => appointment.id === selectedId)
+      ? selectedId
+      : (doctorAppointments[0]?.id || "");
+    renderMedicalRecordForm();
+  }
+
+  function updateNewUserRoleFields() {
+    const isDoctor = newUserRole.value === "doctor";
+    newUserDoctorField.hidden = !isDoctor;
+    newUserDoctor.required = isDoctor;
+    newUserDoctor.disabled = !isDoctor || doctors.length === 0;
   }
 
   function isActive(appointment) {
@@ -578,6 +726,14 @@
     const paymentValue = appointment.paymentStatus === "Pago"
       ? (appointment.paidValue ?? appointment.value)
       : appointment.value;
+    const arrival = appointment.arrivalAt ? new Date(appointment.arrivalAt) : null;
+    const arrived = arrival && !Number.isNaN(arrival.getTime());
+    const checkin = arrived
+      ? `<button class="button checkin-button is-checked-in" type="button" data-action="checkin" data-id="${escapeHTML(appointment.id)}" disabled>✓ Chegou</button><small class="waiting-time" data-arrival-at="${escapeHTML(appointment.arrivalAt)}"></small>`
+      : `<button class="button button-outline checkin-button" type="button" data-action="checkin" data-id="${escapeHTML(appointment.id)}">＋ Check-in</button>`;
+    const whatsapp = currentUserRole === "doctor"
+      ? ""
+      : renderAppointmentWhatsApp(appointment);
     return `<tr class="appointment-row" data-id="${escapeHTML(appointment.id)}" tabindex="0" title="Clique para ver os detalhes">
       <td><div class="patient-cell"><span class="patient-avatar">${escapeHTML(initials(appointment.patientName))}</span><span><strong class="patient-name">${escapeHTML(appointment.patientName)}</strong><small class="patient-phone">${escapeHTML(appointment.patientPhone)}</small></span></div></td>
       <td><span class="date-cell"><strong>${escapeHTML(formatDate(appointment.date))}</strong><span>${escapeHTML(appointment.time)}</span></span></td>
@@ -585,8 +741,55 @@
       <td><span class="type-label">${escapeHTML(appointment.type)}</span></td>
       <td><span class="payment-cell"><strong>${escapeHTML(formatCurrency(paymentValue))}</strong><span>${escapeHTML(paymentLine)}</span></span></td>
       <td><span class="status-badge ${statusClass(appointment.status)}">${escapeHTML(appointment.status)}</span></td>
-      <td><div class="row-actions"><button class="icon-button" type="button" data-action="edit" data-id="${escapeHTML(appointment.id)}" aria-label="Editar consulta de ${escapeHTML(appointment.patientName)}" title="Editar">✎</button><button class="icon-button delete" type="button" data-action="delete" data-id="${escapeHTML(appointment.id)}" aria-label="Excluir consulta de ${escapeHTML(appointment.patientName)}" title="Excluir">×</button></div></td>
+      <td><div class="checkin-cell">${checkin}</div></td>
+      <td><div class="row-actions">${whatsapp}<button class="icon-button" type="button" data-action="edit" data-id="${escapeHTML(appointment.id)}" aria-label="Editar consulta de ${escapeHTML(appointment.patientName)}" title="Editar">✎</button><button class="icon-button delete" type="button" data-action="delete" data-id="${escapeHTML(appointment.id)}" aria-label="Excluir consulta de ${escapeHTML(appointment.patientName)}" title="Excluir">×</button></div></td>
     </tr>`;
+  }
+
+  function renderAppointmentWhatsApp(appointment) {
+    const phone = normalizeBrazilPhone(appointment.patientPhone);
+    if (!phone) return '<span class="whatsapp-unavailable">Telefone inválido para WhatsApp</span>';
+    const doctorName = appointmentDoctor(appointment)?.name || appointment.doctorName;
+    const doctorLine = doctorName ? ` com ${doctorName}` : "";
+    const message = `Olá, ${appointment.patientName}! Podemos confirmar sua consulta${doctorLine}, marcada para ${formatLongDate(appointment.date)} às ${appointment.time}?`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    return `<a class="button button-whatsapp appointment-whatsapp" href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" aria-label="Confirmar consulta de ${escapeHTML(appointment.patientName)} pelo WhatsApp">↗ WhatsApp</a>`;
+  }
+
+  function updateWaitingTimeDisplays() {
+    document.querySelectorAll(".waiting-time[data-arrival-at]").forEach((display) => {
+      const arrival = new Date(display.dataset.arrivalAt);
+      if (Number.isNaN(arrival.getTime())) {
+        display.textContent = "Horário de chegada inválido";
+        return;
+      }
+      const waitingMinutes = Math.max(0, Math.floor((Date.now() - arrival.getTime()) / 60000));
+      const hours = String(Math.floor(waitingMinutes / 60)).padStart(2, "0");
+      const minutes = String(waitingMinutes % 60).padStart(2, "0");
+      display.textContent = `Chegada ${arrival.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · espera ${hours}:${minutes}`;
+    });
+  }
+  window.setInterval(updateWaitingTimeDisplays, 15000);
+
+  async function registerAppointmentCheckin(id) {
+    const index = appointments.findIndex((appointment) => appointment.id === id);
+    if (index < 0) {
+      showToast("Esta consulta não foi encontrada.");
+      return;
+    }
+    if (appointments[index].arrivalAt) return;
+    const previous = appointments;
+    const arrivalAt = new Date().toISOString();
+    appointments = appointments.map((appointment, appointmentIndex) => (
+      appointmentIndex === index ? { ...appointment, arrivalAt } : appointment
+    ));
+    if (!(await saveAppointments())) {
+      appointments = previous;
+      return;
+    }
+    render();
+    const checkedInAppointment = appointments[index];
+    showToast(`Check-in de ${checkedInAppointment.patientName} registrado às ${new Date(arrivalAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`);
   }
 
   function renderStats() {
@@ -736,6 +939,7 @@
   function render() {
     const filtered = getFilteredAppointments();
     list.innerHTML = filtered.map(renderRow).join("");
+    updateWaitingTimeDisplays();
     document.getElementById("result-count").textContent = `${filtered.length} ${filtered.length === 1 ? "consulta" : "consultas"}`;
     emptyState.classList.toggle("is-visible", filtered.length === 0);
     if (appointments.length === 0) {
@@ -750,26 +954,36 @@
     renderDoctorOptions();
     renderDoctorList();
     renderCalendar();
-    renderFinancialData();
+    renderMedicalRecords();
+    if (currentUserRole === "doctor") renderFinancialData();
   }
 
   function setActiveView(view) {
+    if (["financial", "medical-records"].includes(view) && currentUserRole !== "doctor") {
+      showToast("Esta área está disponível apenas para usuários médicos.");
+      view = "agenda";
+    }
     activeView = view;
     const isCalendar = view === "calendar";
     const isDoctors = view === "doctors";
     const isFinancial = view === "financial";
-    appointmentsPanel.hidden = isCalendar || isDoctors || isFinancial;
+    const isMedicalRecords = view === "medical-records";
+    appointmentsPanel.hidden = isCalendar || isDoctors || isFinancial || isMedicalRecords;
     calendarPanel.hidden = !isCalendar;
     doctorsPanel.hidden = !isDoctors;
     financialPanel.hidden = !isFinancial;
+    medicalRecordsPanel.hidden = !isMedicalRecords;
     statsGrid.hidden = view !== "agenda";
-    pageTitle.textContent = isCalendar ? "Minha Agenda" : isDoctors ? "Médicos" : isFinancial ? "Dados financeiros" : "Agenda de consultas";
+    document.getElementById("new-appointment").hidden = view !== "agenda";
+    pageTitle.textContent = isCalendar ? "Minha Agenda" : isDoctors ? "Médicos" : isFinancial ? "Dados financeiros" : isMedicalRecords ? "Prontuário do paciente" : "Agenda de consultas";
     pageSubtitle.textContent = isCalendar
       ? "Visualize separadamente a agenda e os horários de cada médico."
       : isDoctors
         ? "Cadastre os profissionais e configure os horários do consultório."
         : isFinancial
           ? "Acompanhe valores recebidos e pagamentos pendentes."
+          : isMedicalRecords
+            ? "Consulte e registre informações clínicas das suas consultas."
           : "Cadastre e acompanhe os agendamentos do consultório.";
     document.querySelectorAll("[data-view]").forEach((link) => {
       const active = link.dataset.view === view;
@@ -779,6 +993,7 @@
     });
     if (isCalendar) renderCalendar();
     if (isFinancial) renderFinancialData();
+    if (isMedicalRecords) renderMedicalRecords();
     renderConfirmations();
   }
 
@@ -1217,7 +1432,17 @@
     }
     document.getElementById("doctor-id").value = doctor.id;
     document.getElementById("doctor-full-name").value = doctor.name;
-    document.getElementById("doctor-specialty").value = doctor.specialty || "";
+    doctorPhotoData = /^data:image\/jpeg;base64,/.test(doctor.photo || "") ? doctor.photo : "";
+    doctorPhotoInput.value = "";
+    updateDoctorPhotoPreview();
+    const specialtyInput = document.getElementById("doctor-specialty");
+    specialtyInput.querySelectorAll("[data-legacy-specialty]").forEach((option) => option.remove());
+    if (doctor.specialty && ![...specialtyInput.options].some((option) => option.value === doctor.specialty)) {
+      const legacyOption = new Option(`${doctor.specialty} (cadastro existente)`, doctor.specialty);
+      legacyOption.dataset.legacySpecialty = "true";
+      specialtyInput.add(legacyOption);
+    }
+    specialtyInput.value = doctor.specialty || "";
     document.getElementById("doctor-cellphone").value = doctor.cellphone || "";
     document.getElementById("doctor-consultation-value").value = doctor.consultationValue || "";
     document.getElementById("doctor-first-duration").value = doctor.firstDuration || 60;
@@ -1231,7 +1456,8 @@
     document.getElementById("doctor-form-description").textContent = `Atualize os dados, horários e procedimentos de ${doctor.name}.`;
     document.getElementById("save-doctor-button").innerHTML = '<span aria-hidden="true">✓</span> Salvar alterações';
     document.getElementById("cancel-doctor-edit").hidden = false;
-    document.getElementById("doctor-form").scrollIntoView({ behavior: "smooth", block: "start" });
+    doctorFormError.hidden = true;
+    doctorFormDialog.showModal();
     document.getElementById("doctor-full-name").focus({ preventScroll: true });
   }
 
@@ -1266,6 +1492,11 @@
   function resetDoctorForm() {
     doctorForm.reset();
     document.getElementById("doctor-id").value = "";
+    doctorPhotoData = "";
+    doctorPhotoInput.value = "";
+    updateDoctorPhotoPreview();
+    document.getElementById("doctor-specialty").querySelectorAll("[data-legacy-specialty]").forEach((option) => option.remove());
+    doctorFormError.hidden = true;
     renderDoctorWeeklySchedule();
     doctorInsuranceList.replaceChildren();
     doctorProcedureList.replaceChildren();
@@ -1273,10 +1504,15 @@
     document.getElementById("doctor-form-description").textContent = "Cadastre os profissionais e configure dias, horários, duração e valor das consultas.";
     document.getElementById("save-doctor-button").innerHTML = '<span aria-hidden="true">＋</span> Salvar médico';
     document.getElementById("cancel-doctor-edit").hidden = true;
+    if (doctorFormDialog.open) doctorFormDialog.close();
   }
 
   doctorForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (doctorPhotoProcessing) {
+      showToast("Aguarde o processamento da foto antes de salvar o médico.");
+      return;
+    }
     if (!doctorForm.reportValidity()) return;
 
     const id = document.getElementById("doctor-id").value;
@@ -1362,6 +1598,7 @@
     const doctor = {
       id: id || (window.crypto && typeof window.crypto.randomUUID === "function" ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       name: document.getElementById("doctor-full-name").value.trim(),
+      photo: doctorPhotoData,
       specialty: document.getElementById("doctor-specialty").value.trim(),
       cellphone,
       consultationValue: document.getElementById("doctor-consultation-value").value,
@@ -1531,14 +1768,16 @@
     if (button) {
       if (button.dataset.action === "edit") editAppointment(button.dataset.id);
       if (button.dataset.action === "delete") deleteAppointment(button.dataset.id);
+      if (button.dataset.action === "checkin") registerAppointmentCheckin(button.dataset.id);
       return;
     }
+    if (event.target.closest("a")) return;
     const row = event.target.closest("tr[data-id]");
     if (row) openDetails(row.dataset.id);
   });
 
   list.addEventListener("keydown", (event) => {
-    if ((event.key !== "Enter" && event.key !== " ") || event.target.closest("button")) return;
+    if ((event.key !== "Enter" && event.key !== " ") || event.target.closest("button, a")) return;
     const row = event.target.closest("tr[data-id]");
     if (!row) return;
     event.preventDefault();
@@ -1593,6 +1832,52 @@
   document.getElementById("add-doctor-insurance").addEventListener("click", () => addDoctorInsuranceRow());
   document.getElementById("add-doctor-procedure").addEventListener("click", () => addDoctorProcedureRow());
   document.getElementById("cancel-doctor-edit").addEventListener("click", resetDoctorForm);
+  doctorPhotoInput.addEventListener("change", async () => {
+    const file = doctorPhotoInput.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      doctorPhotoInput.value = "";
+      showToast("Escolha uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      doctorPhotoInput.value = "";
+      showToast("A foto deve ter no máximo 8 MB antes da compressão.");
+      return;
+    }
+    doctorPhotoProcessing = true;
+    document.getElementById("save-doctor-button").disabled = true;
+    try {
+      doctorPhotoData = await processDoctorPhoto(file);
+      updateDoctorPhotoPreview();
+    } catch (error) {
+      console.error("Não foi possível processar a foto do médico.", error);
+      showToast(error.message);
+    } finally {
+      doctorPhotoInput.value = "";
+      doctorPhotoProcessing = false;
+      document.getElementById("save-doctor-button").disabled = false;
+    }
+  });
+  removeDoctorPhotoButton.addEventListener("click", () => {
+    doctorPhotoData = "";
+    updateDoctorPhotoPreview();
+  });
+  document.getElementById("add-doctor").addEventListener("click", () => {
+    resetDoctorForm();
+    doctorFormDialog.showModal();
+    document.getElementById("doctor-full-name").focus({ preventScroll: true });
+  });
+  document.getElementById("close-doctor-form").addEventListener("click", resetDoctorForm);
+  doctorFormDialog.addEventListener("click", (event) => {
+    if (event.target === doctorFormDialog) resetDoctorForm();
+  });
+  doctorFormDialog.addEventListener("close", () => {
+    if (document.getElementById("doctor-id").value || !doctorFormError.hidden) resetDoctorForm();
+  });
+  doctorForm.addEventListener("input", () => { doctorFormError.hidden = true; });
+  doctorForm.addEventListener("change", () => { doctorFormError.hidden = true; });
+  document.getElementById("empty-new-appointment").addEventListener("click", () => openAppointmentForm());
   doctorList.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-doctor]");
     if (editButton) {
@@ -1726,15 +2011,25 @@
   });
 
   document.getElementById("export-data").addEventListener("click", exportSystemData);
-  manageUsersButton.addEventListener("click", () => userDialog.showModal());
+  manageUsersButton.addEventListener("click", () => {
+    userForm.reset();
+    renderDoctorOptions();
+    updateNewUserRoleFields();
+    userDialog.showModal();
+  });
   document.getElementById("close-user-dialog").addEventListener("click", () => userDialog.close());
   document.getElementById("cancel-user-create").addEventListener("click", () => userDialog.close());
   userDialog.addEventListener("click", (event) => {
     if (event.target === userDialog) userDialog.close();
   });
+  newUserRole.addEventListener("change", updateNewUserRoleFields);
   userForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!userForm.reportValidity()) return;
+    if (newUserRole.value === "doctor" && !newUserDoctor.value) {
+      showToast("Cadastre ou selecione um médico para vincular à conta.");
+      return;
+    }
     const submitButton = userForm.querySelector('button[type="submit"]');
     submitButton.disabled = true;
     try {
@@ -1742,7 +2037,9 @@
         method: "POST",
         body: JSON.stringify({
           email: document.getElementById("new-user-email").value.trim(),
-          password: document.getElementById("new-user-password").value
+          password: document.getElementById("new-user-password").value,
+          role: newUserRole.value,
+          doctorId: newUserRole.value === "doctor" ? newUserDoctor.value : null
         })
       });
       userForm.reset();
@@ -1767,6 +2064,7 @@
       });
       authToken = result.token;
       currentUserRole = result.user.role;
+      currentUserDoctorId = result.user.doctorId || "";
       sessionStorage.setItem(TOKEN_KEY, authToken);
       await loadCloudState();
       loginPassword.value = "";
@@ -1774,6 +2072,7 @@
       console.error("Não foi possível entrar no AgendeAqui.", error);
       authToken = "";
       currentUserRole = "";
+      currentUserDoctorId = "";
       sessionStorage.removeItem(TOKEN_KEY);
       showLogin(error.message);
     } finally {
@@ -1783,12 +2082,46 @@
   });
   document.getElementById("logout-button").addEventListener("click", () => {
     authToken = "";
+    currentUserRole = "";
+    currentUserDoctorId = "";
     sessionStorage.removeItem(TOKEN_KEY);
     appointments = [];
     doctors = [];
+    medicalRecords = new Map();
     cloudSnapshots.appointments = [];
     cloudSnapshots.doctors = [];
+    document.querySelectorAll('[data-role="doctor"]').forEach((link) => { link.hidden = true; });
+    setActiveView("agenda");
     showLogin();
+  });
+  medicalRecordAppointment.addEventListener("change", renderMedicalRecordForm);
+  medicalRecordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const appointmentId = medicalRecordAppointment.value;
+    if (!appointmentId || !appointments.some((appointment) => appointment.id === appointmentId
+      && appointment.doctorId === currentUserDoctorId)) {
+      showToast("Selecione uma consulta da sua agenda.");
+      return;
+    }
+    const submitButton = document.getElementById("save-medical-record");
+    const content = Object.fromEntries(
+      [...medicalRecordForm.querySelectorAll("textarea[name]")].map((field) => [field.name, field.value.trim()])
+    );
+    submitButton.disabled = true;
+    try {
+      const result = await apiRequest(`/api/medical-records/${encodeURIComponent(appointmentId)}`, {
+        method: "PUT",
+        body: JSON.stringify(content)
+      });
+      medicalRecords.set(result.record.appointmentId, result.record);
+      renderMedicalRecordForm();
+      showToast("Prontuário salvo com segurança na nuvem.");
+    } catch (error) {
+      console.error("Não foi possível salvar o prontuário.", error);
+      showToast(error.message);
+    } finally {
+      submitButton.disabled = false;
+    }
   });
   document.querySelectorAll('a[href="#formulario"]:not([data-view])').forEach((link) => {
     link.addEventListener("click", (event) => {

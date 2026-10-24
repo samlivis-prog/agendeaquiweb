@@ -280,8 +280,17 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
 .doctor-procedure-row .field { margin: 0; }
 .add-insurance-button { margin: 0 22px 18px; }
 .doctor-directory { padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+.doctor-directory-actions { display: flex; align-items: center; gap: 9px; }
 .doctor-list { display: grid; gap: 8px; padding: 0 20px; }
 .doctor-list-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e9eeeb; border-radius: 8px; background: #fbfcfb; }
+.doctor-list-photo, .doctor-list-avatar { display: grid; width: 48px; height: 48px; flex: 0 0 48px; place-items: center; overflow: hidden; border-radius: 50%; color: var(--green); background: #e7f1ec; font-size: 13px; font-weight: 700; object-fit: cover; }
+.doctor-photo-field { display: flex; align-items: center; gap: 14px; }
+.doctor-photo-preview { display: grid; width: 92px; height: 92px; flex: 0 0 92px; place-items: center; overflow: hidden; border: 1px solid #dfe9e3; border-radius: 50%; color: #83a293; background: #f4f8f5; font-size: 42px; }
+.doctor-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.doctor-photo-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.doctor-photo-controls input[type="file"] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.doctor-photo-select { cursor: pointer; }
+.doctor-photo-controls small { flex-basis: 100%; color: #929d97; font-size: 10px; }
 .doctor-list-actions { display: flex; flex: 0 0 auto; gap: 7px; }
 .doctor-delete-button { border-color: #f0d6d3; color: #a64b43; }
 .doctor-delete-button:hover { border-color: #e4aaa4; background: #fff8f7; }
@@ -290,6 +299,18 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
 .doctor-list-info span { color: #687770; font-size: 11px; }
 .doctor-list-info small, .doctor-list-empty { color: #929d97; font-size: 10px; }
 .doctor-list-empty { margin: 0; padding: 9px 0; }
+.doctor-form-dialog { width: min(820px, calc(100% - 28px)); max-width: 820px; max-height: min(92vh, 900px); overflow: auto; padding: 0; border: 0; border-radius: 12px; color: var(--ink); background: white; box-shadow: 0 20px 70px #17251f40; }
+.doctor-form-dialog::backdrop { background: #18231f80; backdrop-filter: blur(2px); }
+.doctor-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #eff2ef; background: white; }
+.doctor-dialog-header .form-heading { flex: 1; }
+.doctor-form-dialog #doctor-form { padding-bottom: 2px; }
+.doctor-form-dialog .form-actions { padding-bottom: 19px; }
+.doctor-form-dialog .appointment-form-error { margin-top: 14px; }
+.checkin-cell { display: grid; min-width: 128px; gap: 5px; }
+.checkin-button { min-height: 30px; justify-self: start; padding: 0 9px; font-size: 10px; white-space: nowrap; }
+.checkin-button.is-checked-in { color: #26764d; background: #eaf5ed; cursor: default; }
+.waiting-time { color: #78837e; font-size: 9px; white-space: nowrap; }
+.appointment-whatsapp { min-height: 30px; padding: 0 9px; font-size: 9px; white-space: nowrap; }
 .appointment-form-error { margin: 14px 22px 0; padding: 11px 13px; border: 1px solid #f0c9c5; border-radius: 7px; color: #9e4038; background: #fff4f2; font-size: 12px; line-height: 1.5; }
 .financial-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; padding: 0 20px 20px; }
 .financial-card { display: grid; gap: 8px; padding: 17px; border: 1px solid #e9eeeb; border-radius: 9px; background: #fbfcfb; }
@@ -319,6 +340,16 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
 .user-form { width: auto; gap: 14px; margin: 0; padding: 18px 0 0; border: 0; border-radius: 0; box-shadow: none; }
 .user-form .auth-description { margin: 0; font-size: 12px; }
 .user-form .form-actions { justify-content: flex-end; margin: 0; padding: 0; border: 0; }
+.medical-records-content { display: grid; gap: 18px; padding: 0 20px 22px; }
+.medical-records-content > .field { display: grid; max-width: 520px; gap: 7px; color: #68746e; font-size: 12px; font-weight: 600; }
+.medical-records-content select, .medical-record-fields textarea { width: 100%; padding: 10px 11px; border: 1px solid #e1e9e4; border-radius: 7px; color: var(--ink); background: white; }
+.medical-record-patient { margin: -7px 0 0; color: #59675f; font-size: 12px; }
+.medical-record-empty { margin: 0; padding: 18px; border-radius: 8px; color: #78837e; background: #f7f9f7; text-align: center; }
+.medical-record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.medical-record-fields .field { display: grid; gap: 7px; color: #68746e; font-size: 11px; font-weight: 600; }
+.medical-record-fields textarea { resize: vertical; min-height: 86px; font-weight: 400; line-height: 1.5; }
+.medical-record-updated { margin: 14px 0 0; color: var(--muted); font-size: 10px; }
+.medical-records-content .form-actions { justify-content: flex-end; }
 .details-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
 .details-header .eyebrow { margin-bottom: 5px; }
 .details-header h2 { overflow-wrap: anywhere; font-size: 20px; }
@@ -369,7 +400,9 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
   th, td { padding-right: 10px; padding-left: 10px; }
 }
 @media (max-width: 780px) {
-  .sidebar { display: none; }
+  .sidebar { display: none;     .medical-record-fields { grid-template-columns: 1fr; }
+    .medical-records-content { padding-right: 13px; padding-left: 13px; }
+  }
   .main-content { width: 100%; margin-left: 0; padding: 0 20px 24px; }
   .topbar { height: 62px; justify-content: space-between; }
   .mobile-brand { display: flex; font-size: 17px; }
@@ -425,6 +458,8 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
   .doctor-days-help { margin-right: 14px; margin-left: 14px; }
   .doctor-weekly-schedule, .doctor-insurances, .doctor-procedures { margin-right: 14px; margin-left: 14px; }
   .doctor-list { padding-right: 14px; padding-left: 14px; }
+  .doctor-directory-actions { align-items: flex-end; flex-direction: column-reverse; }
+  .doctor-directory-actions .button { min-height: 34px; padding: 0 9px; font-size: 10px; }
   .add-insurance-button { margin-left: 14px; }
   .calendar-panel-heading { align-items: flex-start; flex-wrap: wrap; padding-right: 13px; padding-left: 13px; }
   .calendar-month-label, .calendar-legend, .calendar-doctor-filter { padding-right: 13px; padding-left: 13px; }
@@ -441,7 +476,10 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
   .confirmation-alert .panel-heading { align-items: flex-start; }
   .details-card { padding: 18px 15px 14px; }
   .appointment-form-dialog { width: calc(100% - 16px); max-height: 94vh; }
+  .doctor-form-dialog { width: calc(100% - 16px); max-height: 94vh; }
   .appointment-form-dialog .form-heading { gap: 8px; }
+  .doctor-dialog-header .form-heading { gap: 8px; }
+  .doctor-dialog-header .form-heading > div { flex: 1; }
   .appointment-form-dialog .form-heading > div { flex: 1; }
   .financial-summary { grid-template-columns: 1fr; padding-right: 13px; padding-left: 13px; }
   .financial-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: 13px; padding-left: 13px; }
@@ -452,6 +490,8 @@ legend { padding: 0 0 14px; color: #394640; font-family: var(--font-heading); fo
   .doctor-insurance-row { grid-template-columns: 1fr 1fr 30px; gap: 7px; }
   .doctor-procedure-row { grid-template-columns: 1fr 1fr 30px; gap: 7px; }
   .doctor-list-item { align-items: flex-start; }
+  .doctor-photo-field { align-items: flex-start; flex-direction: column; }
+  .doctor-photo-preview { width: 76px; height: 76px; flex-basis: 76px; }
   .doctor-list-actions { flex-direction: column; }
   .details-grid { gap: 15px 10px; }
   .payment-confirmation-fields { grid-template-columns: 1fr; }

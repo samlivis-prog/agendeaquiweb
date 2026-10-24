@@ -77,9 +77,23 @@ function requireAuth(request, response, next) {
   }
 }
 
+function requireDoctor(request, response, next) {
+  if (request.user.role !== "doctor" || !request.user.doctorId) {
+    response.status(403).json({ error: "Acesso exclusivo ao usuário médico vinculado." });
+    return;
+  }
+  next();
+}
+
 function createToken(user) {
   return jwt.sign(
-    { sub: user.id, clinicId: user.clinic_id, role: user.role, email: user.email },
+    {
+      sub: user.id,
+      clinicId: user.clinic_id,
+      role: user.role,
+      doctorId: user.doctor_id,
+      email: user.email
+    },
     jwtSecret,
     { expiresIn: "12h", issuer: "agendeaqui-api", audience: "agendeaqui-web" }
   );
@@ -97,7 +111,7 @@ async function initializeDatabase() {
       clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK (role IN ('owner', 'staff')),
+      role TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS records (
@@ -109,6 +123,23 @@ async function initializeDatabase() {
       PRIMARY KEY (clinic_id, kind, record_id)
     );
     CREATE INDEX IF NOT EXISTS records_clinic_kind_idx ON records (clinic_id, kind);
+    CREATE TABLE IF NOT EXISTS clinical_records (
+      clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+      appointment_id TEXT NOT NULL,
+      doctor_id TEXT NOT NULL,
+      content JSONB NOT NULL,
+      updated_by UUID NOT NULL REFERENCES users(id),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (clinic_id, appointment_id)
+    );
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS doctor_id TEXT;
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+    UPDATE users SET role = 'attendant' WHERE role = 'staff';
+    ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('owner', 'attendant', 'doctor'));
+    CREATE UNIQUE INDEX IF NOT EXISTS users_clinic_doctor_unique_idx
+      ON users (clinic_id, doctor_id) WHERE role = 'doctor';
   `);
 
   const clinicCount = await pool.query("SELECT COUNT(*)::int AS count FROM clinics");
@@ -153,7 +184,7 @@ app.post("/api/auth/login", rateLimit({
   const email = typeof request.body.email === "string" ? request.body.email.trim().toLowerCase() : "";
   const password = typeof request.body.password === "string" ? request.body.password : "";
   const result = await pool.query(
-    "SELECT id, clinic_id, email, password_hash, role FROM users WHERE email = $1",
+    "SELECT id, clinic_id, email, password_hash, role, doctor_id FROM users WHERE email = $1",
     [email]
   );
   const user = result.rows[0];
@@ -161,11 +192,20 @@ app.post("/api/auth/login", rateLimit({
     response.status(401).json({ error: "E-mail ou senha inválidos." });
     return;
   }
-  response.json({ token: createToken(user), user: { email: user.email, role: user.role } });
+  response.json({
+    token: createToken(user),
+    user: { email: user.email, role: user.role, doctorId: user.doctor_id }
+  });
 }));
 
 app.get("/api/auth/me", requireAuth, (request, response) => {
-  response.json({ user: { email: request.user.email, role: request.user.role } });
+  response.json({
+    user: {
+      email: request.user.email,
+      role: request.user.role,
+      doctorId: request.user.doctorId || null
+    }
+  });
 });
 
 app.post("/api/users", requireAuth, asyncRoute(async (request, response) => {
@@ -175,24 +215,41 @@ app.post("/api/users", requireAuth, asyncRoute(async (request, response) => {
   }
   const email = typeof request.body.email === "string" ? request.body.email.trim().toLowerCase() : "";
   const password = typeof request.body.password === "string" ? request.body.password : "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12) {
-    response.status(400).json({ error: "Informe um e-mail válido e uma senha com pelo menos 12 caracteres." });
+  const role = request.body.role;
+  const doctorId = typeof request.body.doctorId === "string" ? request.body.doctorId : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12
+    || !["attendant", "doctor"].includes(role) || (role === "doctor" && !doctorId)) {
+    response.status(400).json({ error: "Informe e-mail, senha válida, tipo de usuário e, para médico, o profissional vinculado." });
     return;
+  }
+  if (role === "doctor") {
+    const doctor = await pool.query(
+      "SELECT 1 FROM records WHERE clinic_id = $1 AND kind = 'doctors' AND record_id = $2",
+      [request.user.clinicId, doctorId]
+    );
+    if (!doctor.rowCount) {
+      response.status(400).json({ error: "O médico selecionado não está cadastrado neste consultório." });
+      return;
+    }
   }
   const passwordHash = await bcrypt.hash(password, 12);
   try {
     await pool.query(
-      "INSERT INTO users (id, clinic_id, email, password_hash, role) VALUES ($1, $2, $3, $4, 'staff')",
-      [randomUUID(), request.user.clinicId, email, passwordHash]
+      "INSERT INTO users (id, clinic_id, email, password_hash, role, doctor_id) VALUES ($1, $2, $3, $4, $5, $6)",
+      [randomUUID(), request.user.clinicId, email, passwordHash, role, role === "doctor" ? doctorId : null]
     );
   } catch (error) {
-    if (error.code === "23505") {
+    if (error.code === "23505" && error.constraint === "users_email_key") {
       response.status(409).json({ error: "Já existe uma conta com esse e-mail." });
+      return;
+    }
+    if (error.code === "23505") {
+      response.status(409).json({ error: "Este médico já possui uma conta de acesso." });
       return;
     }
     throw error;
   }
-  response.status(201).json({ user: { email, role: "staff" } });
+  response.status(201).json({ user: { email, role, doctorId: role === "doctor" ? doctorId : null } });
 }));
 
 app.get("/api/state", requireAuth, asyncRoute(async (request, response) => {
@@ -203,6 +260,89 @@ app.get("/api/state", requireAuth, asyncRoute(async (request, response) => {
   const state = { doctors: [], appointments: [] };
   result.rows.forEach((row) => state[row.kind].push(row.data));
   response.json(state);
+}));
+
+app.get("/api/medical-records", requireAuth, requireDoctor, asyncRoute(async (request, response) => {
+  const result = await pool.query(
+    `SELECT clinical.appointment_id, clinical.content, clinical.updated_at
+     FROM clinical_records AS clinical
+     JOIN records AS appointment
+       ON appointment.clinic_id = clinical.clinic_id
+       AND appointment.kind = 'appointments'
+       AND appointment.record_id = clinical.appointment_id
+     WHERE clinical.clinic_id = $1
+       AND clinical.doctor_id = $2
+       AND appointment.data->>'doctorId' = $2
+     ORDER BY clinical.updated_at DESC`,
+    [request.user.clinicId, request.user.doctorId]
+  );
+  response.json({
+    records: result.rows.map((row) => ({
+      appointmentId: row.appointment_id,
+      content: row.content,
+      updatedAt: row.updated_at
+    }))
+  });
+}));
+
+app.put("/api/medical-records/:appointmentId", requireAuth, requireDoctor, asyncRoute(async (request, response) => {
+  const appointmentId = request.params.appointmentId;
+  const fields = [
+    "complaint", "history", "anamnesis", "examination",
+    "diagnosis", "conduct", "prescription", "followUp"
+  ];
+  const content = {};
+  for (const field of fields) {
+    const value = request.body?.[field] ?? "";
+    if (typeof value !== "string" || value.length > 10000) {
+      response.status(400).json({ error: "Cada campo do prontuário deve ser texto com até 10.000 caracteres." });
+      return;
+    }
+    content[field] = value.trim();
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const appointmentResult = await client.query(
+      "SELECT data FROM records WHERE clinic_id = $1 AND kind = 'appointments' AND record_id = $2 FOR UPDATE",
+      [request.user.clinicId, appointmentId]
+    );
+    const appointment = appointmentResult.rows[0]?.data;
+    if (!appointment || appointment.doctorId !== request.user.doctorId) {
+      await client.query("ROLLBACK");
+      response.status(404).json({ error: "Consulta não encontrada na agenda deste médico." });
+      return;
+    }
+
+    const result = await client.query(
+      `INSERT INTO clinical_records (clinic_id, appointment_id, doctor_id, content, updated_by)
+       VALUES ($1, $2, $3, $4::jsonb, $5)
+       ON CONFLICT (clinic_id, appointment_id)
+       DO UPDATE SET content = EXCLUDED.content, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+       WHERE clinical_records.doctor_id = EXCLUDED.doctor_id
+       RETURNING appointment_id, content, updated_at`,
+      [request.user.clinicId, appointmentId, request.user.doctorId, JSON.stringify(content), request.user.sub]
+    );
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      response.status(409).json({ error: "O prontuário pertence a outro médico." });
+      return;
+    }
+    await client.query("COMMIT");
+    response.json({
+      record: {
+        appointmentId: result.rows[0].appointment_id,
+        content: result.rows[0].content,
+        updatedAt: result.rows[0].updated_at
+      }
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 app.post("/api/records/:kind/sync", requireAuth, asyncRoute(async (request, response) => {
@@ -219,6 +359,45 @@ app.post("/api/records/:kind/sync", requireAuth, asyncRoute(async (request, resp
     || deletedIds.some((id) => typeof id !== "string" || id.length > 200)) {
     response.status(400).json({ error: "Alterações inválidas." });
     return;
+  }
+
+  if (kind === "doctors" && deletedIds.length) {
+    const linkedDoctor = await pool.query(
+      "SELECT 1 FROM users WHERE clinic_id = $1 AND role = 'doctor' AND doctor_id = ANY($2::text[]) LIMIT 1",
+      [request.user.clinicId, deletedIds]
+    );
+    if (linkedDoctor.rowCount) {
+      response.status(409).json({ error: "Não é possível excluir um médico vinculado a uma conta de acesso." });
+      return;
+    }
+  }
+
+  if (kind === "appointments") {
+    if (deletedIds.length) {
+      const existingMedicalRecords = await pool.query(
+        "SELECT 1 FROM clinical_records WHERE clinic_id = $1 AND appointment_id = ANY($2::text[]) LIMIT 1",
+        [request.user.clinicId, deletedIds]
+      );
+      if (existingMedicalRecords.rowCount) {
+        response.status(409).json({ error: "Não é possível excluir uma consulta que possui prontuário clínico." });
+        return;
+      }
+    }
+    const appointmentsWithRecords = upserts.map((appointment) => appointment.id);
+    if (appointmentsWithRecords.length) {
+      const existingMedicalRecords = await pool.query(
+        "SELECT appointment_id, doctor_id FROM clinical_records WHERE clinic_id = $1 AND appointment_id = ANY($2::text[])",
+        [request.user.clinicId, appointmentsWithRecords]
+      );
+      const appointmentById = new Map(upserts.map((appointment) => [appointment.id, appointment]));
+      const changedDoctor = existingMedicalRecords.rows.some((record) => (
+        appointmentById.get(record.appointment_id)?.doctorId !== record.doctor_id
+      ));
+      if (changedDoctor) {
+        response.status(409).json({ error: "Não é possível transferir para outro médico uma consulta que possui prontuário." });
+        return;
+      }
+    }
   }
 
   const client = await pool.connect();

@@ -29,14 +29,18 @@
         <span class="brand-mark" aria-hidden="true">+</span>
         <span>agende<span class="brand-highlight">Aqui</span></span>
       </a>
+      <div class="clinic-brand" id="clinic-brand" hidden>
+        <img id="clinic-brand-logo" alt="Logo da clínica">
+        <span>Sua clínica</span>
+      </div>
 
       <div class="sidebar-caption">CONSULTÓRIO</div>
       <nav aria-label="Navegação principal">
         <a class="nav-link is-active" href="#agenda" data-view="agenda"><span class="nav-icon" aria-hidden="true">▦</span> Agenda</a>
         <a class="nav-link" href="#minha-agenda" data-view="calendar"><span class="nav-icon" aria-hidden="true">▣</span> Minha Agenda</a>
         <a class="nav-link" href="#medicos" data-view="doctors"><span class="nav-icon" aria-hidden="true">♙</span> Médicos</a>
-        <a class="nav-link" href="#financeiro" data-view="financial"><span class="nav-icon" aria-hidden="true">R$</span> Dados financeiros</a>
-        <a class="nav-link" href="#formulario" data-view="form"><span class="nav-icon" aria-hidden="true">＋</span> Nova consulta</a>
+        <a class="nav-link" href="#financeiro" data-view="financial" data-role="doctor"><span class="nav-icon" aria-hidden="true">R$</span> Dados financeiros</a>
+        <a class="nav-link" href="#prontuario" data-view="medical-records" data-role="doctor"><span class="nav-icon" aria-hidden="true">▤</span> Prontuário</a>
       </nav>
 
       <div class="sidebar-note">
@@ -49,11 +53,12 @@
 
     <main class="main-content" id="inicio">
       <header class="topbar">
-        <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">+</span> agende<span class="brand-highlight">Aqui</span></div>
+        <div class="mobile-brand"><span class="brand-mark" aria-hidden="true">+</span> agende<span class="brand-highlight">Aqui</span><img class="clinic-logo-mobile" id="clinic-logo-mobile" alt="Logo da clínica" hidden></div>
         <div class="topbar-spacer"></div>
         <span class="today-label" id="today-label"></span>
         <button class="button button-whatsapp-start" id="open-whatsapp" type="button"><span aria-hidden="true">↗</span> Abrir WhatsApp Web</button>
         <button class="button button-outline" id="manage-users-button" type="button" hidden>Adicionar usuário</button>
+        <button class="button button-outline appearance-button" id="open-appearance" type="button">Personalizar</button>
         <button class="button button-outline" id="logout-button" type="button">Sair</button>
         <span class="avatar" aria-label="Perfil da secretária">S</span>
       </header>
@@ -61,7 +66,8 @@
         <a class="mobile-nav-link is-active" href="#agenda" data-view="agenda"><span aria-hidden="true">▦</span> Agenda</a>
         <a class="mobile-nav-link" href="#minha-agenda" data-view="calendar"><span aria-hidden="true">▣</span> Minha Agenda</a>
         <a class="mobile-nav-link" href="#medicos" data-view="doctors"><span aria-hidden="true">♙</span> Médicos</a>
-        <a class="mobile-nav-link" href="#financeiro" data-view="financial"><span aria-hidden="true">R$</span> Financeiro</a>
+        <a class="mobile-nav-link" href="#financeiro" data-view="financial" data-role="doctor"><span aria-hidden="true">R$</span> Financeiro</a>
+        <a class="mobile-nav-link" href="#prontuario" data-view="medical-records" data-role="doctor"><span aria-hidden="true">▤</span> Prontuário</a>
       </nav>
 
       <section class="page-heading">
@@ -137,6 +143,40 @@
             <tbody id="financial-payments-list"></tbody>
           </table>
           <div class="empty-state" id="financial-empty-state"><span class="empty-icon" aria-hidden="true">R$</span><strong>Nenhum pagamento registrado</strong><p>Os pagamentos confirmados aparecerão aqui.</p></div>
+        </div>
+      </section>
+
+      <section class="appointments-panel medical-records-panel" id="medical-records-panel" aria-labelledby="medical-records-title" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">REGISTRO CLÍNICO</p>
+            <h2 id="medical-records-title">Prontuário do paciente</h2>
+            <p>As informações clínicas são privadas e ficam acessíveis apenas ao médico responsável por esta agenda.</p>
+          </div>
+        </div>
+        <div class="medical-records-content">
+          <label class="field" for="medical-record-appointment">
+            <span>Paciente e consulta</span>
+            <select id="medical-record-appointment"></select>
+          </label>
+          <p class="medical-record-patient" id="medical-record-patient" hidden></p>
+          <p class="medical-record-empty" id="medical-record-empty">Não há consultas associadas ao seu usuário médico.</p>
+          <form id="medical-record-form" hidden>
+            <div class="medical-record-fields">
+              <label class="field"><span>Queixa</span><textarea name="complaint" maxlength="10000" rows="3"></textarea></label>
+              <label class="field"><span>Histórico</span><textarea name="history" maxlength="10000" rows="4"></textarea></label>
+              <label class="field"><span>Anamnese</span><textarea name="anamnesis" maxlength="10000" rows="5"></textarea></label>
+              <label class="field"><span>Exame</span><textarea name="examination" maxlength="10000" rows="4"></textarea></label>
+              <label class="field"><span>Hipótese / diagnóstico</span><textarea name="diagnosis" maxlength="10000" rows="3"></textarea></label>
+              <label class="field"><span>Conduta</span><textarea name="conduct" maxlength="10000" rows="4"></textarea></label>
+              <label class="field"><span>Prescrição</span><textarea name="prescription" maxlength="10000" rows="4"></textarea></label>
+              <label class="field"><span>Retorno</span><textarea name="followUp" maxlength="10000" rows="3"></textarea></label>
+            </div>
+            <p class="medical-record-updated" id="medical-record-updated"></p>
+            <div class="form-actions">
+              <button class="button button-primary" id="save-medical-record" type="submit">Salvar prontuário</button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -241,6 +281,7 @@
                 <th>Tipo</th>
                 <th>Pagamento</th>
                 <th>Situação</th>
+                <th>Chegada / espera</th>
                 <th><span class="sr-only">Ações</span></th>
               </tr>
             </thead>
@@ -250,10 +291,10 @@
             <span class="empty-icon" aria-hidden="true">▦</span>
             <strong id="empty-title">Sua agenda começa aqui</strong>
             <p id="empty-description">Cadastre a primeira consulta para organizar os horários do consultório.</p>
-            <a class="button button-outline" href="#formulario">＋ Cadastrar consulta</a>
+            <button class="button button-outline" type="button" id="empty-new-appointment">＋ Cadastrar consulta</button>
           </div>
         </div>
-        <p class="privacy-note"><span aria-hidden="true">ⓘ</span> Os dados ficam salvos somente neste navegador.</p>
+        <p class="privacy-note"><span aria-hidden="true">ⓘ</span> Dados sincronizados com a nuvem do consultório.</p>
       </section>
 
       <dialog class="appointment-form-dialog" id="appointment-form-dialog" aria-labelledby="form-title">
@@ -404,37 +445,82 @@
       </section>
       </dialog>
 
-      <section class="form-panel doctors-panel" id="doctors-panel" aria-labelledby="doctors-title" hidden>
+      <section class="form-panel doctors-panel" id="doctors-panel" aria-labelledby="doctor-directory-title" hidden>
         <section class="doctor-directory" aria-labelledby="doctor-directory-title">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">EQUIPE DO CONSULTÓRIO</p>
               <h2 id="doctor-directory-title">Médicos cadastrados</h2>
             </div>
-            <span class="result-count" id="doctor-count">0 médicos</span>
+            <div class="doctor-directory-actions">
+              <span class="result-count" id="doctor-count">0 médicos</span>
+              <button class="button button-primary" id="add-doctor" type="button">＋ Inserir médico</button>
+            </div>
           </div>
           <div class="doctor-list" id="doctor-list"></div>
         </section>
-        <div class="panel-heading form-heading">
-          <div>
-            <p class="eyebrow">EQUIPE DO CONSULTÓRIO</p>
-            <h2 id="doctors-title">Cadastrar médico</h2>
-            <p id="doctor-form-description">Cadastre os profissionais e configure dias, horários, duração e valor das consultas.</p>
+      </section>
+
+      <dialog class="doctor-form-dialog" id="doctor-form-dialog" aria-labelledby="doctors-title">
+        <div class="doctor-dialog-header">
+          <div class="panel-heading form-heading">
+            <div>
+              <p class="eyebrow">EQUIPE DO CONSULTÓRIO</p>
+              <h2 id="doctors-title">Cadastrar médico</h2>
+              <p id="doctor-form-description">Cadastre os profissionais e configure dias, horários, duração e valor das consultas.</p>
+            </div>
+            <span class="form-step">MÉDICOS</span>
           </div>
-          <span class="form-step">MÉDICOS</span>
+          <button class="icon-button appointment-form-close" id="close-doctor-form" type="button" aria-label="Fechar cadastro de médico">×</button>
         </div>
         <form id="doctor-form">
+          <p class="appointment-form-error" id="doctor-form-error" role="alert" hidden></p>
           <input id="doctor-id" type="hidden">
           <fieldset>
             <legend><span class="legend-number">1</span> Dados do médico</legend>
             <div class="form-grid">
+              <div class="field field-wide">
+                <span>Foto do médico</span>
+                <div class="doctor-photo-field">
+                  <div class="doctor-photo-preview" id="doctor-photo-preview">
+                    <span id="doctor-photo-placeholder" aria-hidden="true">+</span>
+                    <img id="doctor-photo-image" alt="Pré-visualização da foto do médico" hidden>
+                  </div>
+                  <div class="doctor-photo-controls">
+                    <label class="button button-outline doctor-photo-select" for="doctor-photo">Escolher foto</label>
+                    <input id="doctor-photo" type="file" accept="image/jpeg,image/png,image/webp">
+                    <button class="button button-text" id="remove-doctor-photo" type="button" hidden>Remover foto</button>
+                    <small>JPG, PNG ou WebP. A foto é redimensionada antes de ser enviada.</small>
+                  </div>
+                </div>
+              </div>
               <label class="field field-wide">
                 <span>Nome completo <b>*</b></span>
                 <input id="doctor-full-name" type="text" maxlength="100" autocomplete="name" required>
               </label>
               <label class="field">
                 <span>Especialidade <b>*</b></span>
-                <input id="doctor-specialty" type="text" maxlength="100" required>
+                <select id="doctor-specialty" required>
+                  <option value="">Selecione uma especialidade</option>
+                  <option>Acupuntura</option><option>Alergia e Imunologia</option><option>Anestesiologia</option>
+                  <option>Angiologia</option><option>Cardiologia</option><option>Cirurgia Cardiovascular</option>
+                  <option>Cirurgia da Mão</option><option>Cirurgia de Cabeça e Pescoço</option><option>Cirurgia do Aparelho Digestivo</option>
+                  <option>Cirurgia Geral</option><option>Cirurgia Oncológica</option><option>Cirurgia Pediátrica</option>
+                  <option>Cirurgia Plástica</option><option>Cirurgia Torácica</option><option>Cirurgia Vascular</option>
+                  <option>Clínica Médica</option><option>Coloproctologia</option><option>Dermatologia</option>
+                  <option>Endocrinologia e Metabologia</option><option>Endoscopia</option><option>Gastroenterologia</option>
+                  <option>Genética Médica</option><option>Geriatria</option><option>Ginecologia e Obstetrícia</option>
+                  <option>Hematologia e Hemoterapia</option><option>Homeopatia</option><option>Infectologia</option>
+                  <option>Mastologia</option><option>Medicina de Família e Comunidade</option><option>Medicina do Trabalho</option>
+                  <option>Medicina Esportiva</option><option>Medicina Física e Reabilitação</option><option>Medicina Intensiva</option>
+                  <option>Medicina Legal e Perícia Médica</option><option>Medicina Nuclear</option><option>Medicina Preventiva e Social</option>
+                  <option>Nefrologia</option><option>Neurocirurgia</option><option>Neurologia</option>
+                  <option>Nutrologia</option><option>Oftalmologia</option><option>Oncologia Clínica</option>
+                  <option>Ortopedia e Traumatologia</option><option>Otorrinolaringologia</option><option>Patologia</option>
+                  <option>Patologia Clínica / Medicina Laboratorial</option><option>Pediatria</option><option>Pneumologia</option>
+                  <option>Psiquiatria</option><option>Radiologia e Diagnóstico por Imagem</option><option>Radioterapia</option>
+                  <option>Reumatologia</option><option>Urologia</option><option>Outra</option>
+                </select>
               </label>
               <label class="field">
                 <span>Celular / WhatsApp <b>*</b></span>
@@ -481,11 +567,73 @@
             <button class="button button-primary" type="submit" id="save-doctor-button"><span aria-hidden="true">＋</span> Salvar médico</button>
           </div>
         </form>
-      </section>
+      </dialog>
 
       <footer class="page-footer">AgendeAqui <span>•</span> Uma agenda mais organizada para o seu consultório.</footer>
     </main>
   </div>
+  <dialog class="details-dialog appearance-dialog" id="appearance-dialog" aria-labelledby="appearance-title">
+    <div class="details-card">
+      <header class="details-header">
+        <div>
+          <p class="eyebrow">IDENTIDADE DO CONSULTÓRIO</p>
+          <h2 id="appearance-title">Personalizar aparência</h2>
+        </div>
+        <button class="icon-button details-close" id="close-appearance" type="button" aria-label="Fechar">×</button>
+      </header>
+      <form class="appearance-form" id="appearance-form">
+        <fieldset class="palette-field">
+          <legend>Paleta de cores</legend>
+          <p class="appearance-description">A escolha será aplicada para todos os usuários da clínica.</p>
+          <div class="palette-options">
+            <label class="palette-option">
+              <input type="radio" name="palette" value="sage" required>
+              <span class="palette-swatch palette-sage" aria-hidden="true"></span>
+              <span>Verde natural</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="ocean">
+              <span class="palette-swatch palette-ocean" aria-hidden="true"></span>
+              <span>Azul oceano</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="violet">
+              <span class="palette-swatch palette-violet" aria-hidden="true"></span>
+              <span>Lilás</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="terracotta">
+              <span class="palette-swatch palette-terracotta" aria-hidden="true"></span>
+              <span>Terracota</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="rose">
+              <span class="palette-swatch palette-rose" aria-hidden="true"></span>
+              <span>Rosa</span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="field appearance-logo-field">
+          <span>Logo da clínica</span>
+          <div class="appearance-logo-preview" id="appearance-logo-preview">
+            <span id="appearance-logo-placeholder">Prévia da logo</span>
+            <img id="appearance-logo-image" alt="Prévia da logo da clínica" hidden>
+          </div>
+          <div class="appearance-logo-controls">
+            <label class="button button-outline doctor-photo-select" for="clinic-logo-input">Escolher imagem</label>
+            <input id="clinic-logo-input" type="file" accept="image/jpeg,image/png,image/webp">
+            <button class="button button-text" id="remove-clinic-logo" type="button" hidden>Remover logo</button>
+            <small>JPG, PNG ou WebP; até 4 MB. A imagem é reduzida antes de ser salva.</small>
+          </div>
+        </div>
+        <p class="appearance-error" id="appearance-error" role="alert" hidden></p>
+        <div class="form-actions appearance-actions">
+          <button class="button button-text" id="cancel-appearance" type="button">Cancelar</button>
+          <button class="button button-primary" id="save-appearance" type="submit">Salvar aparência</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
   <dialog class="details-dialog user-dialog" id="user-dialog" aria-labelledby="user-dialog-title">
     <div class="details-card">
       <header class="details-header">
@@ -498,6 +646,15 @@
       <form class="auth-card user-form" id="user-form">
         <label class="field" for="new-user-email"><span>E-mail</span><input id="new-user-email" type="email" autocomplete="off" required></label>
         <label class="field" for="new-user-password"><span>Senha temporária (mínimo 12 caracteres)</span><input id="new-user-password" type="password" minlength="12" autocomplete="new-password" required></label>
+        <label class="field" for="new-user-role"><span>Tipo de usuário</span>
+          <select id="new-user-role" required>
+            <option value="attendant">Atendente</option>
+            <option value="doctor">Médico</option>
+          </select>
+        </label>
+        <label class="field" id="new-user-doctor-field" for="new-user-doctor" hidden><span>Médico vinculado</span>
+          <select id="new-user-doctor"></select>
+        </label>
         <p class="auth-description">Compartilhe a senha temporária com o usuário por um canal seguro.</p>
         <div class="form-actions">
           <button class="button button-text" id="cancel-user-create" type="button">Cancelar</button>
