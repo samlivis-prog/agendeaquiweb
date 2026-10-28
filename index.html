@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f5f7f4">
   <title>AgendeAqui | Consultas</title>
   <link rel="stylesheet" href="styles.css">
@@ -20,7 +21,30 @@
       <label class="field" for="login-password"><span>Senha</span><input id="login-password" type="password" autocomplete="current-password" required></label>
       <p class="auth-error" id="auth-error" role="alert" hidden></p>
       <button class="button button-primary" id="login-button" type="submit">Entrar</button>
+      <button class="button button-text auth-link-button" id="show-password-reset-request" type="button">Esqueci minha senha</button>
       <small>O acesso é individual. Peça ao administrador da conta para criar seu usuário.</small>
+    </form>
+    <form class="auth-card" id="password-reset-request-form" hidden>
+      <span class="brand-mark" aria-hidden="true">+</span>
+      <p class="eyebrow">RECUPERAÇÃO DE ACESSO</p>
+      <h1>Redefinir senha</h1>
+      <p class="auth-description">Informe o e-mail cadastrado. Se a conta existir, enviaremos um link válido por 30 minutos. Se não receber a mensagem, confira o spam ou fale com o suporte da clínica.</p>
+      <label class="field" for="reset-request-email"><span>E-mail</span><input id="reset-request-email" type="email" autocomplete="email" required></label>
+      <p class="auth-error" id="password-reset-request-error" role="alert" hidden></p>
+      <p class="auth-success" id="password-reset-request-success" role="status" hidden></p>
+      <button class="button button-primary" id="password-reset-request-button" type="submit">Enviar link</button>
+      <button class="button button-text auth-link-button" id="back-to-login-from-request" type="button">Voltar para entrar</button>
+    </form>
+    <form class="auth-card" id="password-reset-form" hidden>
+      <span class="brand-mark" aria-hidden="true">+</span>
+      <p class="eyebrow">RECUPERAÇÃO DE ACESSO</p>
+      <h1>Crie uma nova senha</h1>
+      <p class="auth-description">Escolha uma senha com pelo menos 8 caracteres.</p>
+      <label class="field" for="reset-new-password"><span>Nova senha</span><input id="reset-new-password" type="password" minlength="8" autocomplete="new-password" required></label>
+      <label class="field" for="reset-confirm-password"><span>Confirme a nova senha</span><input id="reset-confirm-password" type="password" minlength="8" autocomplete="new-password" required></label>
+      <p class="auth-error" id="password-reset-error" role="alert" hidden></p>
+      <button class="button button-primary" id="password-reset-button" type="submit">Salvar nova senha</button>
+      <button class="button button-text auth-link-button" id="back-to-login-from-reset" type="button">Voltar para entrar</button>
     </form>
   </section>
   <div class="app-shell" id="app-shell" hidden>
@@ -31,8 +55,8 @@
       </a>
       <div class="clinic-brand" id="clinic-brand" hidden>
         <img id="clinic-brand-logo" alt="Logo da clínica">
-        <span>Sua clínica</span>
       </div>
+      <p class="clinic-tagline" id="clinic-tagline" hidden></p>
 
       <div class="sidebar-caption">CONSULTÓRIO</div>
       <nav aria-label="Navegação principal">
@@ -611,6 +635,46 @@
               <span class="palette-swatch palette-rose" aria-hidden="true"></span>
               <span>Rosa</span>
             </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="lavender">
+              <span class="palette-swatch palette-lavender" aria-hidden="true"></span>
+              <span>Lavanda</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="sky">
+              <span class="palette-swatch palette-sky" aria-hidden="true"></span>
+              <span>Azul celeste</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="teal">
+              <span class="palette-swatch palette-teal" aria-hidden="true"></span>
+              <span>Turquesa</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="forest">
+              <span class="palette-swatch palette-forest" aria-hidden="true"></span>
+              <span>Floresta</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="amber">
+              <span class="palette-swatch palette-amber" aria-hidden="true"></span>
+              <span>Âmbar</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="slate">
+              <span class="palette-swatch palette-slate" aria-hidden="true"></span>
+              <span>Ardósia</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="coral">
+              <span class="palette-swatch palette-coral" aria-hidden="true"></span>
+              <span>Coral</span>
+            </label>
+            <label class="palette-option">
+              <input type="radio" name="palette" value="plum">
+              <span class="palette-swatch palette-plum" aria-hidden="true"></span>
+              <span>Ameixa</span>
+            </label>
           </div>
         </fieldset>
         <div class="field appearance-logo-field">
@@ -626,6 +690,11 @@
             <small>JPG, PNG ou WebP; até 4 MB. A imagem é reduzida antes de ser salva.</small>
           </div>
         </div>
+        <label class="field appearance-tagline-field" for="clinic-tagline-input">
+          <span>Frase da clínica</span>
+          <input id="clinic-tagline-input" type="text" maxlength="100" placeholder="Ex.: Cuidado próximo em todas as fases">
+          <small>A frase aparece abaixo da logo para todos os usuários.</small>
+        </label>
         <p class="appearance-error" id="appearance-error" role="alert" hidden></p>
         <div class="form-actions appearance-actions">
           <button class="button button-text" id="cancel-appearance" type="button">Cancelar</button>
@@ -653,8 +722,8 @@
       </section>
       <form class="auth-card user-form" id="user-form" hidden>
         <label class="field" for="new-user-email"><span>E-mail</span><input id="new-user-email" type="email" autocomplete="off" required></label>
-        <label class="field" id="new-user-password-field" for="new-user-password"><span>Senha temporária (mínimo 12 caracteres)</span><input id="new-user-password" type="password" minlength="12" autocomplete="new-password" required></label>
-        <label class="field" id="edit-user-password-field" for="edit-user-password" hidden><span>Nova senha (opcional, mínimo 12 caracteres)</span><input id="edit-user-password" type="password" minlength="12" autocomplete="new-password"></label>
+        <label class="field" id="new-user-password-field" for="new-user-password"><span>Senha temporária (mínimo 8 caracteres)</span><input id="new-user-password" type="password" minlength="8" autocomplete="new-password" required></label>
+        <label class="field" id="edit-user-password-field" for="edit-user-password" hidden><span>Nova senha (opcional, mínimo 8 caracteres)</span><input id="edit-user-password" type="password" minlength="8" autocomplete="new-password"></label>
         <label class="field" for="new-user-role"><span>Tipo de usuário</span>
           <select id="new-user-role" required>
             <option value="attendant">Atendente</option>

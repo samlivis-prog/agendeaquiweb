@@ -85,6 +85,20 @@
   const loginPassword = document.getElementById("login-password");
   const authError = document.getElementById("auth-error");
   const loginButton = document.getElementById("login-button");
+  const passwordResetRequestForm = document.getElementById("password-reset-request-form");
+  const resetRequestEmail = document.getElementById("reset-request-email");
+  const passwordResetRequestError = document.getElementById("password-reset-request-error");
+  const passwordResetRequestSuccess = document.getElementById("password-reset-request-success");
+  const passwordResetRequestButton = document.getElementById("password-reset-request-button");
+  const passwordResetForm = document.getElementById("password-reset-form");
+  const resetNewPassword = document.getElementById("reset-new-password");
+  const resetConfirmPassword = document.getElementById("reset-confirm-password");
+  const passwordResetError = document.getElementById("password-reset-error");
+  const passwordResetButton = document.getElementById("password-reset-button");
+  let passwordResetToken = new URLSearchParams(window.location.search).get("resetToken") || "";
+  if (passwordResetToken) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`);
+  }
   const manageUsersButton = document.getElementById("manage-users-button");
   const userDialog = document.getElementById("user-dialog");
   const userForm = document.getElementById("user-form");
@@ -112,10 +126,13 @@
   const clinicBrand = document.getElementById("clinic-brand");
   const clinicBrandLogo = document.getElementById("clinic-brand-logo");
   const clinicLogoMobile = document.getElementById("clinic-logo-mobile");
+  const clinicTagline = document.getElementById("clinic-tagline");
+  const clinicTaglineInput = document.getElementById("clinic-tagline-input");
+  const appearanceButton = document.getElementById("open-appearance");
   let currentUserRole = "";
   let currentUserDoctorId = "";
   let editingUserId = "";
-  let clinicSettings = { palette: "sage", logo: null };
+  let clinicSettings = { palette: "sage", logo: null, tagline: "" };
   let draftClinicLogo = null;
   let doctorPhotoData = "";
   let doctorPhotoProcessing = false;
@@ -173,8 +190,22 @@
     if (userDialog.open) userDialog.close();
     authScreen.hidden = false;
     appShell.hidden = true;
+    authError.classList.remove("auth-success");
+    authError.classList.add("auth-error");
     authError.textContent = message || (API_BASE_URL ? "" : "Configure a URL da API publicada em config.js.");
     authError.hidden = !authError.textContent;
+  }
+
+  function showAuthForm(formName) {
+    loginForm.hidden = formName !== "login";
+    passwordResetRequestForm.hidden = formName !== "request";
+    passwordResetForm.hidden = formName !== "reset";
+    authError.hidden = true;
+    passwordResetRequestError.hidden = true;
+    passwordResetRequestSuccess.hidden = true;
+    passwordResetError.hidden = true;
+    authScreen.hidden = false;
+    appShell.hidden = true;
   }
 
   function copyRecords(records) {
@@ -182,10 +213,14 @@
   }
 
   function applyClinicSettings(settings) {
-    const palettes = ["sage", "ocean", "violet", "terracotta", "rose"];
+    const palettes = [
+      "sage", "ocean", "violet", "terracotta", "rose",
+      "lavender", "sky", "teal", "forest", "amber", "slate", "coral", "plum"
+    ];
     clinicSettings = {
       palette: palettes.includes(settings?.palette) ? settings.palette : "sage",
-      logo: typeof settings?.logo === "string" ? settings.logo : null
+      logo: typeof settings?.logo === "string" ? settings.logo : null,
+      tagline: typeof settings?.tagline === "string" ? settings.tagline : ""
     };
     document.documentElement.dataset.palette = clinicSettings.palette;
     document.querySelectorAll('input[name="palette"]').forEach((input) => {
@@ -201,6 +236,9 @@
       clinicBrandLogo.removeAttribute("src");
       clinicLogoMobile.removeAttribute("src");
     }
+    clinicTagline.textContent = clinicSettings.tagline;
+    clinicTagline.hidden = !clinicSettings.tagline;
+    clinicTaglineInput.value = clinicSettings.tagline;
     renderClinicLogoPreview(clinicSettings.logo);
   }
 
@@ -430,6 +468,7 @@
     authScreen.hidden = true;
     appShell.hidden = false;
     manageUsersButton.hidden = currentUserRole !== "owner";
+    appearanceButton.hidden = currentUserRole !== "owner";
     document.querySelectorAll('[data-role="doctor"]').forEach((link) => {
       link.hidden = currentUserRole !== "doctor";
     });
@@ -2249,9 +2288,10 @@
       saveUserButton.disabled = false;
     }
   });
-  document.getElementById("open-appearance").addEventListener("click", () => {
+  appearanceButton.addEventListener("click", () => {
     appearanceError.hidden = true;
     draftClinicLogo = clinicSettings.logo;
+    clinicTaglineInput.value = clinicSettings.tagline;
     renderClinicLogoPreview(draftClinicLogo);
     appearanceDialog.showModal();
   });
@@ -2288,7 +2328,11 @@
     try {
       const result = await apiRequest("/api/clinic/settings", {
         method: "PUT",
-        body: JSON.stringify({ palette, logo: draftClinicLogo })
+        body: JSON.stringify({
+          palette,
+          logo: draftClinicLogo,
+          tagline: clinicTaglineInput.value.trim()
+        })
       });
       applyClinicSettings(result.settings);
       appearanceDialog.close();
@@ -2301,8 +2345,75 @@
       submitButton.disabled = false;
     }
   });
+  document.getElementById("show-password-reset-request").addEventListener("click", () => {
+    resetRequestEmail.value = loginEmail.value.trim();
+    showAuthForm("request");
+  });
+  document.getElementById("back-to-login-from-request").addEventListener("click", () => showAuthForm("login"));
+  document.getElementById("back-to-login-from-reset").addEventListener("click", () => {
+    passwordResetToken = "";
+    showAuthForm("login");
+  });
+  passwordResetRequestForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    passwordResetRequestError.hidden = true;
+    passwordResetRequestSuccess.hidden = true;
+    passwordResetRequestButton.disabled = true;
+    try {
+      const result = await apiRequest("/api/auth/password-reset/request", {
+        method: "POST",
+        body: JSON.stringify({ email: resetRequestEmail.value.trim() })
+      });
+      passwordResetRequestSuccess.textContent = result.message;
+      passwordResetRequestSuccess.hidden = false;
+    } catch (error) {
+      console.error("Não foi possível solicitar a redefinição de senha.", error);
+      passwordResetRequestError.textContent = error.message;
+      passwordResetRequestError.hidden = false;
+    } finally {
+      passwordResetRequestButton.disabled = false;
+    }
+  });
+  passwordResetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    passwordResetError.hidden = true;
+    if (resetNewPassword.value !== resetConfirmPassword.value) {
+      passwordResetError.textContent = "As senhas não coincidem.";
+      passwordResetError.hidden = false;
+      return;
+    }
+    if (!passwordResetToken) {
+      passwordResetError.textContent = "Este link de redefinição não é válido. Solicite um novo.";
+      passwordResetError.hidden = false;
+      return;
+    }
+    passwordResetButton.disabled = true;
+    try {
+      const result = await apiRequest("/api/auth/password-reset/complete", {
+        method: "POST",
+        body: JSON.stringify({ token: passwordResetToken, password: resetNewPassword.value })
+      });
+      passwordResetToken = "";
+      resetNewPassword.value = "";
+      resetConfirmPassword.value = "";
+      sessionStorage.removeItem(TOKEN_KEY);
+      showAuthForm("login");
+      authError.classList.remove("auth-error");
+      authError.classList.add("auth-success");
+      authError.textContent = result.message;
+      authError.hidden = false;
+    } catch (error) {
+      console.error("Não foi possível redefinir a senha.", error);
+      passwordResetError.textContent = error.message;
+      passwordResetError.hidden = false;
+    } finally {
+      passwordResetButton.disabled = false;
+    }
+  });
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    authError.classList.remove("auth-success");
+    authError.classList.add("auth-error");
     authError.hidden = true;
     loginButton.disabled = true;
     loginButton.textContent = "Entrando...";
@@ -2322,6 +2433,8 @@
       authToken = "";
       currentUserRole = "";
       currentUserDoctorId = "";
+      manageUsersButton.hidden = true;
+      appearanceButton.hidden = true;
       applyClinicSettings({ palette: "sage", logo: null });
       sessionStorage.removeItem(TOKEN_KEY);
       showLogin(error.message);
@@ -2388,7 +2501,12 @@
   financialDateFrom.value = localDateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
   financialDateTo.value = localDateKey(currentDate);
   updateInsuranceFields("");
-  void initializeCloudSession();
+  if (passwordResetToken) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    showAuthForm("reset");
+  } else {
+    void initializeCloudSession();
+  }
   window.setInterval(() => { void refreshCloudState(); }, 30000);
   window.addEventListener("focus", () => { void refreshCloudState(); });
 })();

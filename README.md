@@ -18,7 +18,9 @@ Esta cópia mantém a interface do AgendeAqui, mas salva médicos e consultas em
    - `JWT_SECRET`: segredo aleatório com pelo menos 32 caracteres. Não o coloque no GitHub nem no `config.js`.
    - `FRONTEND_ORIGINS`: origem exata do GitHub Pages, por exemplo `https://seu-usuario.github.io` (sem caminho final como `/agendeaquiweb`).
    - `ADMIN_EMAIL`: e-mail do primeiro administrador.
-   - `ADMIN_PASSWORD`: senha inicial forte, com pelo menos 12 caracteres.
+   - `ADMIN_PASSWORD`: senha inicial com pelo menos 8 caracteres.
+   - `FRONTEND_URL`: endereço completo da página publicada, incluindo o caminho do projeto, por exemplo `https://seu-usuario.github.io/agendeaquiweb/`. A origem (sem o caminho) também deve estar em `FRONTEND_ORIGINS`.
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` e `SMTP_FROM`: credenciais SMTP do provedor de e-mail. Use um remetente verificado; para TLS implícito na porta 465, defina também `SMTP_SECURE=true`. Na porta 587, deixe `SMTP_SECURE=false` ou não defina.
    - `NODE_ENV=production`.
 4. Publique o serviço e copie sua URL HTTPS, por exemplo `https://agendeaqui-api.onrender.com`.
 5. Em `config.js`, informe essa URL:
@@ -31,6 +33,8 @@ Esta cópia mantém a interface do AgendeAqui, mas salva médicos e consultas em
 
 O banco cria a conta inicial apenas quando ainda não há consultório cadastrado. Depois de confirmar que o primeiro acesso funciona, remova `ADMIN_PASSWORD` das variáveis do Render. O hash da senha fica no banco; a senha não é armazenada em texto puro.
 
+Na tela de login, **Esqueci minha senha** envia um link de uso único ao e-mail cadastrado. O link expira em 30 minutos; a nova senha deve ter pelo menos 8 caracteres. Ao redefinir a senha, as sessões existentes são encerradas. A recuperação fica indisponível até configurar `FRONTEND_URL` e as variáveis SMTP no serviço Render. Guarde as credenciais SMTP apenas nas variáveis do Render, nunca no GitHub ou em `config.js`.
+
 ## Perfis de acesso
 
 O administrador entra na página e usa **Gerenciar usuários** para consultar as contas da clínica, criar usuários, alterar o e-mail ou o tipo de acesso, redefinir senhas e excluir contas. A conta administradora inicial é protegida contra edição e exclusão nesta tela; usuários que atualizaram prontuários não podem ser excluídos para preservar o histórico clínico.
@@ -38,7 +42,7 @@ O administrador entra na página e usa **Gerenciar usuários** para consultar as
 - **Atendente:** agenda, médicos e consultas; não vê os links Financeiro e Prontuário.
 - **Médico:** recebe vínculo obrigatório a um cadastro de médico, tem os acessos do atendente, mais Financeiro, e pode abrir/salvar prontuários apenas das consultas vinculadas ao seu cadastro. A API valida esse vínculo em toda leitura e gravação clínica.
 
-Todos os usuários autenticados podem usar **Personalizar** para escolher uma paleta e uma logo da clínica. A identidade visual é compartilhada com os usuários da mesma clínica e persistida no PostgreSQL; a imagem é reduzida no navegador antes de ser enviada.
+O administrador pode usar **Personalizar** para escolher entre 13 paletas, enviar uma logo e cadastrar uma frase para a clínica. A identidade visual é compartilhada com os usuários da mesma clínica e persistida no PostgreSQL; a imagem é reduzida no navegador antes de ser enviada.
 
 O prontuário da consulta contém queixa, histórico, anamnese, exame, hipótese/diagnóstico, conduta, prescrição e retorno. Os dados clínicos são guardados em tabela separada no PostgreSQL e não são enviados no endpoint de agenda. Somente o usuário médico vinculado tem acesso aos prontuários daquele médico. A conta inicial `owner` continua sendo a administradora de usuários; ela não é um usuário médico. Credenciais devem ser entregues por um canal seguro.
 
