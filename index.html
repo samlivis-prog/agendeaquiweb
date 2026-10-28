@@ -57,7 +57,7 @@
         <div class="topbar-spacer"></div>
         <span class="today-label" id="today-label"></span>
         <button class="button button-whatsapp-start" id="open-whatsapp" type="button"><span aria-hidden="true">↗</span> Abrir WhatsApp Web</button>
-        <button class="button button-outline" id="manage-users-button" type="button" hidden>Adicionar usuário</button>
+        <button class="button button-outline" id="manage-users-button" type="button" hidden>Gerenciar usuários</button>
         <button class="button button-outline appearance-button" id="open-appearance" type="button">Personalizar</button>
         <button class="button button-outline" id="logout-button" type="button">Sair</button>
         <span class="avatar" aria-label="Perfil da secretária">S</span>
@@ -639,13 +639,22 @@
       <header class="details-header">
         <div>
           <p class="eyebrow">ACESSO À EQUIPE</p>
-          <h2 id="user-dialog-title">Adicionar usuário</h2>
+          <h2 id="user-dialog-title">Gerenciar usuários</h2>
         </div>
         <button class="icon-button details-close" id="close-user-dialog" type="button" aria-label="Fechar">×</button>
       </header>
-      <form class="auth-card user-form" id="user-form">
+      <section class="user-list-section" aria-labelledby="user-list-title">
+        <div class="user-list-heading">
+          <h3 id="user-list-title">Usuários cadastrados</h3>
+          <button class="button button-primary" id="start-user-create" type="button">＋ Adicionar usuário</button>
+        </div>
+        <p class="user-list-message" id="user-list-message">Carregando usuários...</p>
+        <div class="user-list" id="user-list"></div>
+      </section>
+      <form class="auth-card user-form" id="user-form" hidden>
         <label class="field" for="new-user-email"><span>E-mail</span><input id="new-user-email" type="email" autocomplete="off" required></label>
-        <label class="field" for="new-user-password"><span>Senha temporária (mínimo 12 caracteres)</span><input id="new-user-password" type="password" minlength="12" autocomplete="new-password" required></label>
+        <label class="field" id="new-user-password-field" for="new-user-password"><span>Senha temporária (mínimo 12 caracteres)</span><input id="new-user-password" type="password" minlength="12" autocomplete="new-password" required></label>
+        <label class="field" id="edit-user-password-field" for="edit-user-password" hidden><span>Nova senha (opcional, mínimo 12 caracteres)</span><input id="edit-user-password" type="password" minlength="12" autocomplete="new-password"></label>
         <label class="field" for="new-user-role"><span>Tipo de usuário</span>
           <select id="new-user-role" required>
             <option value="attendant">Atendente</option>
@@ -655,10 +664,11 @@
         <label class="field" id="new-user-doctor-field" for="new-user-doctor" hidden><span>Médico vinculado</span>
           <select id="new-user-doctor"></select>
         </label>
-        <p class="auth-description">Compartilhe a senha temporária com o usuário por um canal seguro.</p>
+        <p class="auth-description" id="user-form-description">Compartilhe a senha temporária com o usuário por um canal seguro.</p>
+        <p class="auth-error" id="user-form-error" role="alert" hidden></p>
         <div class="form-actions">
           <button class="button button-text" id="cancel-user-create" type="button">Cancelar</button>
-          <button class="button button-primary" type="submit">Criar usuário</button>
+          <button class="button button-primary" type="submit" id="save-user-button">Criar usuário</button>
         </div>
       </form>
     </div>

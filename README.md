@@ -33,10 +33,12 @@ O banco cria a conta inicial apenas quando ainda não há consultório cadastrad
 
 ## Perfis de acesso
 
-O administrador entra na página e usa **Adicionar usuário** para criar contas individuais:
+O administrador entra na página e usa **Gerenciar usuários** para consultar as contas da clínica, criar usuários, alterar o e-mail ou o tipo de acesso, redefinir senhas e excluir contas. A conta administradora inicial é protegida contra edição e exclusão nesta tela; usuários que atualizaram prontuários não podem ser excluídos para preservar o histórico clínico.
 
 - **Atendente:** agenda, médicos e consultas; não vê os links Financeiro e Prontuário.
 - **Médico:** recebe vínculo obrigatório a um cadastro de médico, tem os acessos do atendente, mais Financeiro, e pode abrir/salvar prontuários apenas das consultas vinculadas ao seu cadastro. A API valida esse vínculo em toda leitura e gravação clínica.
+
+Todos os usuários autenticados podem usar **Personalizar** para escolher uma paleta e uma logo da clínica. A identidade visual é compartilhada com os usuários da mesma clínica e persistida no PostgreSQL; a imagem é reduzida no navegador antes de ser enviada.
 
 O prontuário da consulta contém queixa, histórico, anamnese, exame, hipótese/diagnóstico, conduta, prescrição e retorno. Os dados clínicos são guardados em tabela separada no PostgreSQL e não são enviados no endpoint de agenda. Somente o usuário médico vinculado tem acesso aos prontuários daquele médico. A conta inicial `owner` continua sendo a administradora de usuários; ela não é um usuário médico. Credenciais devem ser entregues por um canal seguro.
 

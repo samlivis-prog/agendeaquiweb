@@ -88,11 +88,35 @@
   const manageUsersButton = document.getElementById("manage-users-button");
   const userDialog = document.getElementById("user-dialog");
   const userForm = document.getElementById("user-form");
+  const userListSection = document.querySelector(".user-list-section");
+  const userList = document.getElementById("user-list");
+  const userListMessage = document.getElementById("user-list-message");
+  const userFormError = document.getElementById("user-form-error");
+  const userFormTitle = document.getElementById("user-dialog-title");
+  const userFormDescription = document.getElementById("user-form-description");
+  const saveUserButton = document.getElementById("save-user-button");
+  const newUserPassword = document.getElementById("new-user-password");
+  const editUserPassword = document.getElementById("edit-user-password");
+  const newUserPasswordField = document.getElementById("new-user-password-field");
+  const editUserPasswordField = document.getElementById("edit-user-password-field");
   const newUserRole = document.getElementById("new-user-role");
   const newUserDoctorField = document.getElementById("new-user-doctor-field");
   const newUserDoctor = document.getElementById("new-user-doctor");
+  const appearanceDialog = document.getElementById("appearance-dialog");
+  const appearanceForm = document.getElementById("appearance-form");
+  const appearanceError = document.getElementById("appearance-error");
+  const clinicLogoInput = document.getElementById("clinic-logo-input");
+  const appearanceLogoImage = document.getElementById("appearance-logo-image");
+  const appearanceLogoPlaceholder = document.getElementById("appearance-logo-placeholder");
+  const removeClinicLogoButton = document.getElementById("remove-clinic-logo");
+  const clinicBrand = document.getElementById("clinic-brand");
+  const clinicBrandLogo = document.getElementById("clinic-brand-logo");
+  const clinicLogoMobile = document.getElementById("clinic-logo-mobile");
   let currentUserRole = "";
   let currentUserDoctorId = "";
+  let editingUserId = "";
+  let clinicSettings = { palette: "sage", logo: null };
+  let draftClinicLogo = null;
   let doctorPhotoData = "";
   let doctorPhotoProcessing = false;
   let medicalRecords = new Map();
@@ -144,6 +168,7 @@
   function showLogin(message = "") {
     if (detailsDialog.open) detailsDialog.close();
     if (appointmentFormDialog.open) appointmentFormDialog.close();
+    if (appearanceDialog.open) appearanceDialog.close();
     if (doctorFormDialog.open) resetDoctorForm();
     if (userDialog.open) userDialog.close();
     authScreen.hidden = false;
@@ -154,6 +179,168 @@
 
   function copyRecords(records) {
     return records.map((record) => ({ ...record }));
+  }
+
+  function applyClinicSettings(settings) {
+    const palettes = ["sage", "ocean", "violet", "terracotta", "rose"];
+    clinicSettings = {
+      palette: palettes.includes(settings?.palette) ? settings.palette : "sage",
+      logo: typeof settings?.logo === "string" ? settings.logo : null
+    };
+    document.documentElement.dataset.palette = clinicSettings.palette;
+    document.querySelectorAll('input[name="palette"]').forEach((input) => {
+      input.checked = input.value === clinicSettings.palette;
+    });
+    const hasLogo = Boolean(clinicSettings.logo);
+    clinicBrand.hidden = !hasLogo;
+    clinicLogoMobile.hidden = !hasLogo;
+    if (hasLogo) {
+      clinicBrandLogo.src = clinicSettings.logo;
+      clinicLogoMobile.src = clinicSettings.logo;
+    } else {
+      clinicBrandLogo.removeAttribute("src");
+      clinicLogoMobile.removeAttribute("src");
+    }
+    renderClinicLogoPreview(clinicSettings.logo);
+  }
+
+  function renderClinicLogoPreview(logo) {
+    appearanceLogoImage.hidden = !logo;
+    appearanceLogoPlaceholder.hidden = Boolean(logo);
+    removeClinicLogoButton.hidden = !logo;
+    if (logo) appearanceLogoImage.src = logo;
+    else appearanceLogoImage.removeAttribute("src");
+  }
+
+  async function compressClinicLogo(file) {
+    if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      throw new Error("Escolha uma imagem JPG, PNG ou WebP.");
+    }
+    if (file.size > 4 * 1024 * 1024) throw new Error("A imagem deve ter no máximo 4 MB.");
+    const image = await createImageBitmap(file);
+    try {
+      const scale = Math.min(1, 480 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Não foi possível preparar a imagem da logo neste navegador.");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let dataUrl = canvas.toDataURL("image/webp", 0.88);
+      if (!dataUrl.startsWith("data:image/webp")) dataUrl = canvas.toDataURL("image/png");
+      if (dataUrl.length > 700000) throw new Error("A imagem ficou muito grande mesmo após a redução. Escolha um arquivo menor.");
+      return dataUrl;
+    } finally {
+      image.close();
+    }
+  }
+
+  async function loadUsers() {
+    userList.replaceChildren();
+    userListMessage.textContent = "Carregando usuários...";
+    userListMessage.hidden = false;
+    try {
+      const result = await apiRequest("/api/users");
+      userListMessage.hidden = true;
+      userList.replaceChildren();
+      for (const user of result.users) {
+        const row = document.createElement("article");
+        row.className = "user-list-row";
+        const details = document.createElement("div");
+        details.className = "user-list-details";
+        const email = document.createElement("strong");
+        email.textContent = user.email;
+        const role = document.createElement("span");
+        const roleNames = { owner: "Administrador", attendant: "Atendente", doctor: "Médico" };
+        const linkedDoctor = doctors.find((doctor) => doctor.id === user.doctorId);
+        role.textContent = user.role === "doctor" && linkedDoctor
+          ? `Médico · ${linkedDoctor.name}`
+          : roleNames[user.role] || user.role;
+        details.append(email, role);
+        row.append(details);
+        if (user.role !== "owner") {
+          const actions = document.createElement("div");
+          actions.className = "user-list-actions";
+          const editButton = document.createElement("button");
+          editButton.className = "button button-outline";
+          editButton.type = "button";
+          editButton.textContent = "Editar";
+          editButton.addEventListener("click", () => beginUserEdit(user));
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "button button-text user-delete-button";
+          deleteButton.type = "button";
+          deleteButton.textContent = "Excluir";
+          deleteButton.addEventListener("click", () => { void deleteUser(user); });
+          actions.append(editButton, deleteButton);
+          row.append(actions);
+        }
+        userList.append(row);
+      }
+      if (!result.users.length) {
+        userListMessage.textContent = "Nenhum usuário cadastrado.";
+        userListMessage.hidden = false;
+      }
+    } catch (error) {
+      console.error("Não foi possível carregar os usuários.", error);
+      userListMessage.textContent = error.message;
+      userListMessage.hidden = false;
+    }
+  }
+
+  function beginUserCreate() {
+    editingUserId = "";
+    userForm.reset();
+    userFormError.hidden = true;
+    userFormTitle.textContent = "Adicionar usuário";
+    userFormDescription.textContent = "Compartilhe a senha temporária com o usuário por um canal seguro.";
+    newUserPasswordField.hidden = false;
+    newUserPassword.required = true;
+    editUserPasswordField.hidden = true;
+    userListSection.hidden = true;
+    userForm.hidden = false;
+    saveUserButton.textContent = "Criar usuário";
+    renderDoctorOptions();
+    updateNewUserRoleFields();
+  }
+
+  function beginUserEdit(user) {
+    editingUserId = user.id;
+    userForm.reset();
+    userFormError.hidden = true;
+    document.getElementById("new-user-email").value = user.email;
+    newUserRole.value = user.role;
+    newUserPasswordField.hidden = true;
+    newUserPassword.required = false;
+    editUserPasswordField.hidden = false;
+    userFormTitle.textContent = "Editar usuário";
+    userFormDescription.textContent = "A conta administradora é protegida. Deixe a senha em branco para mantê-la.";
+    saveUserButton.textContent = "Salvar alterações";
+    userListSection.hidden = true;
+    userForm.hidden = false;
+    renderDoctorOptions();
+    newUserDoctor.value = user.doctorId || "";
+    updateNewUserRoleFields();
+  }
+
+  function cancelUserForm() {
+    userForm.hidden = true;
+    userListSection.hidden = false;
+    editingUserId = "";
+    userFormError.hidden = true;
+    userForm.reset();
+  }
+
+  async function deleteUser(user) {
+    if (!window.confirm(`Excluir o acesso de ${user.email}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await apiRequest(`/api/users/${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      showToast("Usuário excluído.");
+      await loadUsers();
+    } catch (error) {
+      console.error("Não foi possível excluir o usuário.", error);
+      userListMessage.textContent = error.message;
+      userListMessage.hidden = false;
+    }
   }
 
   function recordSignature(value) {
@@ -210,7 +397,11 @@
 
   async function loadCloudState() {
     setActiveView("agenda");
-    const state = await apiRequest("/api/state");
+    const [state, appearance] = await Promise.all([
+      apiRequest("/api/state"),
+      apiRequest("/api/clinic/settings")
+    ]);
+    applyClinicSettings(appearance.settings);
     appointments = Array.isArray(state.appointments) ? state.appointments : [];
     doctors = Array.isArray(state.doctors) ? state.doctors : [];
     cloudSnapshots.appointments = copyRecords(appointments);
@@ -267,11 +458,14 @@
 
   async function refreshCloudState() {
     if (!authToken || pendingSaves || syncing || detailsDialog.open
-      || appointmentFormDialog.open || document.getElementById("doctor-id").value
+      || appointmentFormDialog.open || appearanceDialog.open || userDialog.open
+      || document.getElementById("doctor-id").value
       || activeView === "medical-records") return;
     syncing = true;
     try {
       const state = await apiRequest("/api/state");
+      const appearance = await apiRequest("/api/clinic/settings");
+      applyClinicSettings(appearance.settings);
       appointments = Array.isArray(state.appointments) ? state.appointments : [];
       doctors = Array.isArray(state.doctors) ? state.doctors : [];
       cloudSnapshots.appointments = copyRecords(appointments);
@@ -2012,13 +2206,13 @@
 
   document.getElementById("export-data").addEventListener("click", exportSystemData);
   manageUsersButton.addEventListener("click", () => {
-    userForm.reset();
-    renderDoctorOptions();
-    updateNewUserRoleFields();
+    cancelUserForm();
     userDialog.showModal();
+    void loadUsers();
   });
+  document.getElementById("start-user-create").addEventListener("click", beginUserCreate);
   document.getElementById("close-user-dialog").addEventListener("click", () => userDialog.close());
-  document.getElementById("cancel-user-create").addEventListener("click", () => userDialog.close());
+  document.getElementById("cancel-user-create").addEventListener("click", cancelUserForm);
   userDialog.addEventListener("click", (event) => {
     if (event.target === userDialog) userDialog.close();
   });
@@ -2030,24 +2224,79 @@
       showToast("Cadastre ou selecione um médico para vincular à conta.");
       return;
     }
-    const submitButton = userForm.querySelector('button[type="submit"]');
-    submitButton.disabled = true;
+    saveUserButton.disabled = true;
+    userFormError.hidden = true;
     try {
-      await apiRequest("/api/users", {
-        method: "POST",
-        body: JSON.stringify({
-          email: document.getElementById("new-user-email").value.trim(),
-          password: document.getElementById("new-user-password").value,
-          role: newUserRole.value,
-          doctorId: newUserRole.value === "doctor" ? newUserDoctor.value : null
-        })
+      const requestBody = {
+        email: document.getElementById("new-user-email").value.trim(),
+        password: editingUserId ? editUserPassword.value : newUserPassword.value,
+        role: newUserRole.value,
+        doctorId: newUserRole.value === "doctor" ? newUserDoctor.value : null
+      };
+      await apiRequest(editingUserId ? `/api/users/${encodeURIComponent(editingUserId)}` : "/api/users", {
+        method: editingUserId ? "PATCH" : "POST",
+        body: JSON.stringify(requestBody)
       });
-      userForm.reset();
-      userDialog.close();
-      showToast("Usuário criado. Compartilhe as credenciais por um canal seguro.");
+      const wasEditing = Boolean(editingUserId);
+      cancelUserForm();
+      await loadUsers();
+      showToast(wasEditing ? "Usuário atualizado." : "Usuário criado. Compartilhe as credenciais por um canal seguro.");
     } catch (error) {
-      console.error("Não foi possível criar o usuário.", error);
-      showToast(error.message);
+      console.error("Não foi possível salvar o usuário.", error);
+      userFormError.textContent = error.message;
+      userFormError.hidden = false;
+    } finally {
+      saveUserButton.disabled = false;
+    }
+  });
+  document.getElementById("open-appearance").addEventListener("click", () => {
+    appearanceError.hidden = true;
+    draftClinicLogo = clinicSettings.logo;
+    renderClinicLogoPreview(draftClinicLogo);
+    appearanceDialog.showModal();
+  });
+  document.getElementById("close-appearance").addEventListener("click", () => appearanceDialog.close());
+  document.getElementById("cancel-appearance").addEventListener("click", () => appearanceDialog.close());
+  appearanceDialog.addEventListener("click", (event) => {
+    if (event.target === appearanceDialog) appearanceDialog.close();
+  });
+  clinicLogoInput.addEventListener("change", async () => {
+    const file = clinicLogoInput.files?.[0];
+    if (!file) return;
+    appearanceError.hidden = true;
+    try {
+      draftClinicLogo = await compressClinicLogo(file);
+      renderClinicLogoPreview(draftClinicLogo);
+    } catch (error) {
+      console.error("Não foi possível processar a logo da clínica.", error);
+      appearanceError.textContent = error.message;
+      appearanceError.hidden = false;
+      clinicLogoInput.value = "";
+    }
+  });
+  removeClinicLogoButton.addEventListener("click", () => {
+    draftClinicLogo = null;
+    clinicLogoInput.value = "";
+    renderClinicLogoPreview(null);
+  });
+  appearanceForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const palette = appearanceForm.querySelector('input[name="palette"]:checked')?.value;
+    const submitButton = document.getElementById("save-appearance");
+    submitButton.disabled = true;
+    appearanceError.hidden = true;
+    try {
+      const result = await apiRequest("/api/clinic/settings", {
+        method: "PUT",
+        body: JSON.stringify({ palette, logo: draftClinicLogo })
+      });
+      applyClinicSettings(result.settings);
+      appearanceDialog.close();
+      showToast("A identidade visual da clínica foi salva.");
+    } catch (error) {
+      console.error("Não foi possível salvar a aparência da clínica.", error);
+      appearanceError.textContent = error.message;
+      appearanceError.hidden = false;
     } finally {
       submitButton.disabled = false;
     }
@@ -2073,6 +2322,7 @@
       authToken = "";
       currentUserRole = "";
       currentUserDoctorId = "";
+      applyClinicSettings({ palette: "sage", logo: null });
       sessionStorage.removeItem(TOKEN_KEY);
       showLogin(error.message);
     } finally {
@@ -2084,6 +2334,7 @@
     authToken = "";
     currentUserRole = "";
     currentUserDoctorId = "";
+    applyClinicSettings({ palette: "sage", logo: null });
     sessionStorage.removeItem(TOKEN_KEY);
     appointments = [];
     doctors = [];

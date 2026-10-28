@@ -45,7 +45,7 @@ app.use((request, response, next) => {
     response.setHeader("Access-Control-Allow-Origin", origin);
     response.setHeader("Vary", "Origin");
     response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   }
   if (request.method === "OPTIONS") {
     response.sendStatus(204);
@@ -71,10 +71,24 @@ function requireAuth(request, response, next) {
       issuer: "agendeaqui-api",
       audience: "agendeaqui-web"
     });
-    next();
   } catch {
     response.status(401).json({ error: "Sessão expirada. Entre novamente." });
+    return;
   }
+  pool.query(
+    "SELECT clinic_id, email, role, doctor_id FROM users WHERE id = $1 AND clinic_id = $2",
+    [request.user.sub, request.user.clinicId]
+  ).then((result) => {
+    const user = result.rows[0];
+    if (!user) {
+      response.status(401).json({ error: "Esta conta não está mais ativa. Entre novamente." });
+      return;
+    }
+    request.user.email = user.email;
+    request.user.role = user.role;
+    request.user.doctorId = user.doctor_id;
+    next();
+  }).catch(next);
 }
 
 function requireDoctor(request, response, next) {
@@ -105,6 +119,12 @@ async function initializeDatabase() {
       id UUID PRIMARY KEY,
       name TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS clinic_settings (
+      clinic_id UUID PRIMARY KEY REFERENCES clinics(id) ON DELETE CASCADE,
+      palette TEXT NOT NULL DEFAULT 'sage',
+      logo_data TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY,
@@ -208,6 +228,56 @@ app.get("/api/auth/me", requireAuth, (request, response) => {
   });
 });
 
+app.get("/api/clinic/settings", requireAuth, asyncRoute(async (request, response) => {
+  const result = await pool.query(
+    "SELECT palette, logo_data FROM clinic_settings WHERE clinic_id = $1",
+    [request.user.clinicId]
+  );
+  const settings = result.rows[0] || { palette: "sage", logo_data: null };
+  response.json({ settings: { palette: settings.palette, logo: settings.logo_data } });
+}));
+
+app.put("/api/clinic/settings", requireAuth, asyncRoute(async (request, response) => {
+  const palette = request.body?.palette;
+  const logo = request.body?.logo;
+  const supportedPalettes = ["sage", "ocean", "violet", "terracotta", "rose"];
+  if (!supportedPalettes.includes(palette)
+    || (logo !== null && (typeof logo !== "string"
+      || logo.length > 700000
+      || !/^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(logo)))) {
+    response.status(400).json({ error: "Escolha uma paleta válida e uma imagem PNG, JPG ou WebP reduzida." });
+    return;
+  }
+  const result = await pool.query(
+    `INSERT INTO clinic_settings (clinic_id, palette, logo_data)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (clinic_id)
+     DO UPDATE SET palette = EXCLUDED.palette, logo_data = EXCLUDED.logo_data, updated_at = NOW()
+     RETURNING palette, logo_data`,
+    [request.user.clinicId, palette, logo]
+  );
+  response.json({ settings: { palette: result.rows[0].palette, logo: result.rows[0].logo_data } });
+}));
+
+app.get("/api/users", requireAuth, asyncRoute(async (request, response) => {
+  if (request.user.role !== "owner") {
+    response.status(403).json({ error: "Somente o administrador pode consultar os usuários." });
+    return;
+  }
+  const result = await pool.query(
+    "SELECT id, email, role, doctor_id FROM users WHERE clinic_id = $1 ORDER BY created_at, email",
+    [request.user.clinicId]
+  );
+  response.json({
+    users: result.rows.map((user) => ({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      doctorId: user.doctor_id
+    }))
+  });
+}));
+
 app.post("/api/users", requireAuth, asyncRoute(async (request, response) => {
   if (request.user.role !== "owner") {
     response.status(403).json({ error: "Somente o administrador pode criar usuários." });
@@ -250,6 +320,114 @@ app.post("/api/users", requireAuth, asyncRoute(async (request, response) => {
     throw error;
   }
   response.status(201).json({ user: { email, role, doctorId: role === "doctor" ? doctorId : null } });
+}));
+
+app.patch("/api/users/:id", requireAuth, asyncRoute(async (request, response) => {
+  if (request.user.role !== "owner") {
+    response.status(403).json({ error: "Somente o administrador pode editar usuários." });
+    return;
+  }
+  const { id } = request.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    response.status(404).json({ error: "Usuário não encontrado neste consultório." });
+    return;
+  }
+  const email = typeof request.body?.email === "string" ? request.body.email.trim().toLowerCase() : "";
+  const role = request.body?.role;
+  const doctorId = typeof request.body?.doctorId === "string" ? request.body.doctorId : "";
+  const password = typeof request.body?.password === "string" ? request.body.password : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    || !["attendant", "doctor"].includes(role)
+    || (role === "doctor" && !doctorId)
+    || (password && password.length < 12)) {
+    response.status(400).json({ error: "Informe um e-mail válido, tipo de usuário, vínculo médico quando necessário e senha com pelo menos 12 caracteres." });
+    return;
+  }
+  const targetResult = await pool.query(
+    "SELECT id, role FROM users WHERE id = $1 AND clinic_id = $2",
+    [id, request.user.clinicId]
+  );
+  const target = targetResult.rows[0];
+  if (!target) {
+    response.status(404).json({ error: "Usuário não encontrado neste consultório." });
+    return;
+  }
+  if (target.role === "owner" || id === request.user.sub) {
+    response.status(403).json({ error: "A conta administradora não pode ser editada por esta tela." });
+    return;
+  }
+  if (role === "doctor") {
+    const doctor = await pool.query(
+      "SELECT 1 FROM records WHERE clinic_id = $1 AND kind = 'doctors' AND record_id = $2",
+      [request.user.clinicId, doctorId]
+    );
+    if (!doctor.rowCount) {
+      response.status(400).json({ error: "O médico selecionado não está cadastrado neste consultório." });
+      return;
+    }
+  }
+  const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET email = $3, role = $4, doctor_id = $5,
+           password_hash = COALESCE($6, password_hash)
+       WHERE id = $1 AND clinic_id = $2
+       RETURNING id, email, role, doctor_id`,
+      [id, request.user.clinicId, email, role, role === "doctor" ? doctorId : null, passwordHash]
+    );
+    response.json({
+      user: {
+        id: result.rows[0].id,
+        email: result.rows[0].email,
+        role: result.rows[0].role,
+        doctorId: result.rows[0].doctor_id
+      }
+    });
+  } catch (error) {
+    if (error.code === "23505" && error.constraint === "users_email_key") {
+      response.status(409).json({ error: "Já existe uma conta com esse e-mail." });
+      return;
+    }
+    if (error.code === "23505") {
+      response.status(409).json({ error: "Este médico já possui uma conta de acesso." });
+      return;
+    }
+    throw error;
+  }
+}));
+
+app.delete("/api/users/:id", requireAuth, asyncRoute(async (request, response) => {
+  if (request.user.role !== "owner") {
+    response.status(403).json({ error: "Somente o administrador pode excluir usuários." });
+    return;
+  }
+  const { id } = request.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    response.status(404).json({ error: "Usuário não encontrado neste consultório." });
+    return;
+  }
+  if (id === request.user.sub) {
+    response.status(403).json({ error: "Você não pode excluir sua própria conta." });
+    return;
+  }
+  const clinicalRecord = await pool.query(
+    "SELECT 1 FROM clinical_records WHERE clinic_id = $1 AND updated_by = $2 LIMIT 1",
+    [request.user.clinicId, id]
+  );
+  if (clinicalRecord.rowCount) {
+    response.status(409).json({ error: "Este usuário atualizou prontuários e não pode ser excluído para preservar o histórico clínico." });
+    return;
+  }
+  const result = await pool.query(
+    "DELETE FROM users WHERE id = $1 AND clinic_id = $2 AND role <> 'owner' RETURNING id",
+    [id, request.user.clinicId]
+  );
+  if (!result.rowCount) {
+    response.status(404).json({ error: "Usuário não encontrado ou conta administradora protegida." });
+    return;
+  }
+  response.json({ deleted: true });
 }));
 
 app.get("/api/state", requireAuth, asyncRoute(async (request, response) => {
