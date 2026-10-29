@@ -2359,6 +2359,7 @@
     passwordResetRequestError.hidden = true;
     passwordResetRequestSuccess.hidden = true;
     passwordResetRequestButton.disabled = true;
+    passwordResetRequestButton.textContent = "Enviando...";
     try {
       const result = await apiRequest("/api/auth/password-reset/request", {
         method: "POST",
@@ -2372,6 +2373,7 @@
       passwordResetRequestError.hidden = false;
     } finally {
       passwordResetRequestButton.disabled = false;
+      passwordResetRequestButton.textContent = "Enviar link";
     }
   });
   passwordResetForm.addEventListener("submit", async (event) => {

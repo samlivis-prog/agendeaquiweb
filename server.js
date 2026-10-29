@@ -24,6 +24,9 @@ const mailTransport = smtpConfigured
       host: smtpHost,
       port: smtpPort,
       secure: process.env.SMTP_SECURE === "true" || smtpPort === 465,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
       auth: { user: smtpUser, pass: smtpPass }
     }))
   : null;
